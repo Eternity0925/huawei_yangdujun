@@ -1,0 +1,28 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "羊肚菌智慧大棚模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "羊肚菌智慧大棚"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "羊肚菌智慧大棚"
+    },
+    {
+      "name": "permission_location_reason",
+      "value": "用于获取大棚、天气和设备相关的位置信息"
+    },
+    {
+      "name": "permission_microphone_reason",
+      "value": "用于视频监控或音视频能力中的音频采集"
+    },
+    {
+      "name": "permission_imagevideo_reason",
+      "value": "用于选择头像、读取图片和视频资源"
+    }
+  ]
+}

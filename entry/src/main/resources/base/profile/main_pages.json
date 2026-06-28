@@ -1,0 +1,27 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/LoginPage",
+    "pages/RegisterPage",
+    "pages/GreenhouseHomePage",
+    "pages/ManagePage",
+    "pages/MinePage",
+    "pages/SettingsPage",
+    "pages/DeviceManagePage",
+    "pages/DeviceMonitorPage",
+    "pages/GreenhouseListPage",
+    "pages/AddGreenhousePage",
+    "pages/AlarmRecordPage",
+    "pages/AlarmDetailPage",
+    "pages/AlarmHandlePage",
+    "pages/AlarmThresholdPage",
+    "pages/RealTimeAnalysisPage",
+    "pages/HistoryAnalysisPage",
+    "pages/WeatherPage",
+    "pages/VideoPage",
+    "pages/AiSuggestionPage",
+    "pages/FeedbackPage",
+    "pages/EditProfilePage",
+    "pages/NewPasswordPage"
+  ]
+}
