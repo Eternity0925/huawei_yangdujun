@@ -1,4 +1,5 @@
 import { router } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { AppRoutes } from '../common/AppRoutes';
 import { Greenhouse } from '../models/AppModels';
 import { AppService } from '../services/AppService';
@@ -10,20 +11,13 @@ struct GreenhouseListPage {
 
   build() {
     Column({ space: 12 }) {
+      AndroidBackTopBar({ title: '大棚列表' })
       Row() {
-        Text('<')
-          .fontSize(22)
-          .fontColor('#238B45')
-          .onClick(() => router.back())
-        Text('大棚列表')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#143D2A')
-          .margin({ left: 12 })
         Blank()
         Button('新增')
           .height(34)
           .backgroundColor('#238B45')
+          .borderRadius(17)
           .onClick(() => router.pushUrl({ url: AppRoutes.ADD_GREENHOUSE }))
       }
       .width('100%')
@@ -42,12 +36,13 @@ struct GreenhouseListPage {
         .width('100%')
         .padding(16)
         .backgroundColor(Color.White)
-        .borderRadius(8)
+        .borderRadius(14)
+        .shadow({ radius: 2, color: '#18000000', offsetX: 0, offsetY: 1 })
       }, (item: Greenhouse) => item.id)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18 })
-    .backgroundColor('#F6FBF6')
+    .padding({ left: 16, right: 16, top: 10 })
+    .backgroundColor('#E9F2E6')
   }
 }

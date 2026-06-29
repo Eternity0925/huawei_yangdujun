@@ -72,11 +72,12 @@ struct VideoPage {
       Column() {
         Row() {
           Button('返回')
-            .height(45)
-            .fontSize(14)
+            .width(70)
+            .height(36)
+            .fontSize(13)
             .fontColor(Color.White)
-            .backgroundColor(AndroidColor.GREEN_DARK)
-            .borderRadius(12)
+            .backgroundColor('#6F9F62')
+            .borderRadius(18)
             .onClick(() => {
               this.isPlaying = false;
               this.isPaused = false;
@@ -84,13 +85,19 @@ struct VideoPage {
             })
           Text('大棚视频监控')
             .layoutWeight(1)
-            .fontSize(30)
+            .fontSize(21)
             .fontWeight(FontWeight.Bold)
-            .fontColor(AndroidColor.GREEN_TEXT)
+            .fontColor(Color.White)
             .textAlign(TextAlign.Center)
+          Blank()
+            .width(70)
         }
         .width('100%')
         .height(62)
+        .padding({ left: 14, right: 14 })
+        .backgroundColor(AndroidColor.GREEN_HEADER)
+        .borderRadius(14)
+        .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
         .margin({ bottom: 12 })
 
         Stack() {
@@ -108,7 +115,7 @@ struct VideoPage {
           .width('100%')
           .height(220)
           .backgroundColor(Color.Black)
-          .borderRadius(24)
+          .borderRadius(14)
 
           Circle()
             .width(16)
@@ -180,6 +187,6 @@ struct VideoPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(AndroidColor.PAGE_BG)
+    .backgroundColor('#E9F2E6')
   }
 }

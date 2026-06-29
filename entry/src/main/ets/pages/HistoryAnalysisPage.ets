@@ -1,51 +1,281 @@
 import { router } from '@kit.ArkUI';
+import webview from '@ohos.web.webview';
+import { Greenhouse } from '../models/AppModels';
+import { AppService } from '../services/AppService';
 
-interface TrendItem {
-  day: string;
-  temp: string;
-  humi: string;
-  soil: string;
+interface SelectItem {
+  value: string;
+}
+
+interface ChartPoint {
+  label: string;
+  airTemp: number;
+  airHum: number;
+  soilTemp: number;
+  soilHum: number;
+  light: number;
+  co2: number;
+  ph: number;
+}
+
+interface WebSeries {
+  name: string;
+  color: string;
+  data: number[];
+}
+
+interface WebChart {
+  title: string;
+  type: string;
+  badge: string;
+  labels: string[];
+  min: number;
+  max: number;
+  series: WebSeries[];
+}
+
+interface WebChartPayload {
+  charts: WebChart[];
 }
 
 @Entry
 @Component
 struct HistoryAnalysisPage {
-  private trends: TrendItem[] = [
-    { day: '06-18', temp: '17.8℃', humi: '84%', soil: '70%' },
-    { day: '06-19', temp: '18.1℃', humi: '86%', soil: '72%' },
-    { day: '06-20', temp: '18.6℃', humi: '83%', soil: '69%' },
-    { day: '06-21', temp: '17.9℃', humi: '88%', soil: '74%' },
-    { day: '06-22', temp: '18.3℃', humi: '85%', soil: '71%' }
-  ];
+  @State selectedIndex: number = 0;
+  @State dayCount: number = 7;
+  private controller: webview.WebviewController = new webview.WebviewController();
+  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
 
-  build() {
+  private currentGreenhouse(): Greenhouse {
+    return this.greenhouses[this.selectedIndex] || this.greenhouses[0];
+  }
+
+  private greenhouseOptions(): SelectItem[] {
+    const options: SelectItem[] = [];
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      options.push({ value: this.greenhouses[i].name });
+    }
+    return options;
+  }
+
+  private chartData(): ChartPoint[] {
+    const data: ChartPoint[] = [];
+    const base = AppService.getSensorData(this.currentGreenhouse().id);
+    for (let i = this.dayCount - 1; i >= 0; i--) {
+      const day = 24 - i;
+      const wave = (this.dayCount - i) % 5;
+      data.push({
+        label: `06-${day < 10 ? '0' + day : day}`,
+        airTemp: Number((base.airTemperature + wave * 0.35 - 0.7).toFixed(1)),
+        airHum: Math.round(base.airHumidity + wave - 2),
+        soilTemp: Number((base.soilTemperature + wave * 0.25 - 0.5).toFixed(1)),
+        soilHum: Math.round(base.soilHumidity + wave - 2),
+        light: Math.round(base.light + wave * 90 - 160),
+        co2: Math.round(base.co2 + wave * 24 - 48),
+        ph: Number((base.ph + wave * 0.04 - 0.08).toFixed(2))
+      });
+    }
+    return data;
+  }
+
+  private seriesValues(points: ChartPoint[], key: string): number[] {
+    const values: number[] = [];
+    for (let i = 0; i < points.length; i++) {
+      if (key === 'airTemp') {
+        values.push(points[i].airTemp);
+      } else if (key === 'airHum') {
+        values.push(points[i].airHum);
+      } else if (key === 'soilTemp') {
+        values.push(points[i].soilTemp);
+      } else if (key === 'soilHum') {
+        values.push(points[i].soilHum);
+      } else if (key === 'light') {
+        values.push(points[i].light);
+      } else if (key === 'co2') {
+        values.push(points[i].co2);
+      } else {
+        values.push(points[i].ph);
+      }
+    }
+    return values;
+  }
+
+  private labels(points: ChartPoint[]): string[] {
+    const labels: string[] = [];
+    for (let i = 0; i < points.length; i++) {
+      labels.push(points[i].label);
+    }
+    return labels;
+  }
+
+  private payload(): WebChartPayload {
+    const points = this.chartData();
+    const labels = this.labels(points);
+    return {
+      charts: [
+        {
+          title: '空气温湿度监测',
+          type: 'area',
+          badge: '面积图',
+          labels,
+          min: 0,
+          max: 100,
+          series: [
+            { name: '温度 (℃)', color: '#FF5722', data: this.seriesValues(points, 'airTemp') },
+            { name: '湿度 (%)', color: '#2196F3', data: this.seriesValues(points, 'airHum') }
+          ]
+        },
+        {
+          title: '土壤温湿度监测',
+          type: 'column',
+          badge: '柱状图',
+          labels,
+          min: 0,
+          max: 100,
+          series: [
+            { name: '土壤温度 (℃)', color: '#FF5722', data: this.seriesValues(points, 'soilTemp') },
+            { name: '土壤湿度 (%)', color: '#2196F3', data: this.seriesValues(points, 'soilHum') }
+          ]
+        },
+        {
+          title: '光照强度',
+          type: 'spline',
+          badge: '平滑曲线图',
+          labels,
+          min: 300,
+          max: 1600,
+          series: [
+            { name: '光照强度', color: '#FFC107', data: this.seriesValues(points, 'light') }
+          ]
+        },
+        {
+          title: '气体监测',
+          type: 'area',
+          badge: '面积图',
+          labels,
+          min: 350,
+          max: 900,
+          series: [
+            { name: '二氧化碳 (ppm)', color: '#9C27B0', data: this.seriesValues(points, 'co2') }
+          ]
+        },
+        {
+          title: 'PH值变化',
+          type: 'spline',
+          badge: '平滑曲线图',
+          labels,
+          min: 5.8,
+          max: 7.4,
+          series: [
+            { name: 'PH值', color: '#F44336', data: this.seriesValues(points, 'ph') }
+          ]
+        }
+      ]
+    };
+  }
+
+  private injectCharts(): void {
+    const script = `window.renderAACharts(${JSON.stringify(this.payload())});`;
+    this.controller.runJavaScript(script).then(() => {
+    }).catch(() => {
+    });
+  }
+
+  @Builder
+  Header(title: string) {
+    Row() {
+      Text('<')
+        .width(40)
+        .height(40)
+        .fontSize(24)
+        .fontColor(Color.White)
+        .textAlign(TextAlign.Center)
+        .backgroundColor('#89AE5E')
+        .borderRadius(20)
+        .onClick(() => router.back())
+      Text(title)
+        .layoutWeight(1)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .textAlign(TextAlign.Center)
+        .margin({ right: 40 })
+    }
+    .width('100%')
+    .height(62)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor('#558C58')
+    .borderRadius(14)
+    .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
+  }
+
+  @Builder
+  FilterCard() {
     Column({ space: 12 }) {
       Row() {
-        Text('<').fontSize(22).fontColor('#238B45').onClick(() => router.back())
-        Text('历史分析').fontSize(24).fontWeight(FontWeight.Bold).fontColor('#143D2A').margin({ left: 12 })
-      }.width('100%')
-
-      Row() {
-        Text('日期').fontSize(13).fontColor('#667085').layoutWeight(1)
-        Text('温度').fontSize(13).fontColor('#667085').layoutWeight(1).textAlign(TextAlign.Center)
-        Text('空气湿度').fontSize(13).fontColor('#667085').layoutWeight(1).textAlign(TextAlign.Center)
-        Text('土壤湿度').fontSize(13).fontColor('#667085').layoutWeight(1).textAlign(TextAlign.End)
+        Text('● 当前大棚')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#6BA878')
+        Select(this.greenhouseOptions())
+          .selected(this.selectedIndex)
+          .value(this.currentGreenhouse().name)
+          .layoutWeight(1)
+          .height(48)
+          .margin({ left: 12 })
+          .onSelect((index: number) => {
+            this.selectedIndex = index;
+            setTimeout(() => this.injectCharts(), 30);
+          })
       }
       .width('100%')
-      .padding({ left: 16, right: 16 })
 
-      ForEach(this.trends, (item: TrendItem) => {
-        Row() {
-          Text(item.day).fontSize(15).fontColor('#667085').layoutWeight(1)
-          Text(item.temp).fontSize(16).fontColor('#D9480F').layoutWeight(1).textAlign(TextAlign.Center)
-          Text(item.humi).fontSize(16).fontColor('#1971C2').layoutWeight(1).textAlign(TextAlign.Center)
-          Text(item.soil).fontSize(16).fontColor('#238B45').layoutWeight(1).textAlign(TextAlign.End)
-        }.width('100%').padding(16).backgroundColor(Color.White).borderRadius(8)
-      }, (item: TrendItem) => item.day)
+      Divider().color('#F0F0F0')
+
+      Row({ space: 12 }) {
+        this.RangeButton('近 7 天', 7)
+        this.RangeButton('近 14 天', 14)
+      }
+      .width('100%')
+      .height(44)
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(Color.White)
+    .borderRadius(14)
+    .shadow({ radius: 2, color: '#18000000', offsetX: 0, offsetY: 1 })
+  }
+
+  @Builder
+  RangeButton(text: string, value: number) {
+    Button(text)
+      .layoutWeight(1)
+      .height(44)
+      .fontSize(13)
+      .fontColor(this.dayCount === value ? Color.White : '#6BA878')
+      .backgroundColor(this.dayCount === value ? '#6BA878' : '#F2F6F1')
+      .borderRadius(12)
+      .onClick(() => {
+        this.dayCount = value;
+        setTimeout(() => this.injectCharts(), 30);
+      })
+  }
+
+  build() {
+    Column({ space: 16 }) {
+      this.Header('历史数据分析')
+      this.FilterCard()
+      Web({ src: $rawfile('aa_charts.html'), controller: this.controller })
+        .layoutWeight(1)
+        .javaScriptAccess(true)
+        .domStorageAccess(true)
+        .fileAccess(true)
+        .backgroundColor('#E9F2E6')
+        .onPageEnd(() => this.injectCharts())
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18 })
-    .backgroundColor('#F6FBF6')
+    .padding(16)
+    .backgroundColor('#E9F2E6')
   }
 }

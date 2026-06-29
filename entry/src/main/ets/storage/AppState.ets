@@ -3,12 +3,15 @@ import {
   AlarmRecord,
   Device,
   EnvironmentPoint,
+  FeedbackRecord,
   Greenhouse,
   SensorData,
   SettingItem,
   ThresholdConfig,
   User
 } from '../models/AppModels';
+import { common } from '@kit.AbilityKit';
+import { preferences } from '@kit.ArkData';
 
 interface StoredUser extends User {
   password: string;
@@ -25,6 +28,11 @@ interface ThresholdEntry {
 }
 
 export class AppState {
+  private static readonly STORE_NAME: string = 'yangdujun_app_state';
+  private static readonly SETTINGS_KEY: string = 'settings';
+  private static readonly FEEDBACKS_KEY: string = 'feedbacks';
+  private static store: preferences.Preferences | null = null;
+
   static currentUser: User | null = null;
 
   static users: StoredUser[] = [
@@ -143,7 +151,19 @@ export class AppState {
     { id: 'voice', title: '语音识别', description: '按住说话后识别并询问 AI', enabled: true }
   ];
 
+  static feedbacks: FeedbackRecord[] = [];
+
   static chatHistory: string = '';
+
+  static async init(context: common.UIAbilityContext): Promise<void> {
+    try {
+      AppState.store = await preferences.getPreferences(context, AppState.STORE_NAME);
+      AppState.loadPersistedSettings();
+      AppState.loadPersistedFeedbacks();
+    } catch (err) {
+      AppState.store = null;
+    }
+  }
 
   static isLoggedIn(): boolean {
     return AppState.currentUser !== null;
@@ -254,6 +274,30 @@ export class AppState {
     }
   }
 
+  static updateSetting(id: string, enabled: boolean): void {
+    const setting = AppState.settings.find((item: SettingItem) => item.id === id);
+    if (!setting) {
+      return;
+    }
+    setting.enabled = enabled;
+    AppState.persistSettings();
+  }
+
+  static addFeedback(content: string): boolean {
+    const trimmed = content.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+    AppState.feedbacks.unshift({
+      id: AppState.generateId('feedback'),
+      content: trimmed,
+      createdAt: AppState.nowText(),
+      userPhone: AppState.currentUser ? AppState.currentUser.phone : ''
+    });
+    AppState.persistFeedbacks();
+    return true;
+  }
+
   static saveEnvironmentPoint(greenhouseId: string, data: SensorData): void {
     AppState.history.push({
       greenhouseId,
@@ -336,6 +380,59 @@ export class AppState {
       status: '待处理',
       createdAt: AppState.nowText()
     });
+  }
+
+  private static loadPersistedSettings(): void {
+    if (!AppState.store) {
+      return;
+    }
+    try {
+      const saved = AppState.store.getSync(AppState.SETTINGS_KEY, '') as string;
+      if (saved.length === 0) {
+        return;
+      }
+      const parsed = JSON.parse(saved) as SettingItem[];
+      if (Array.isArray(parsed)) {
+        AppState.settings = parsed;
+      }
+    } catch (err) {
+    }
+  }
+
+  private static loadPersistedFeedbacks(): void {
+    if (!AppState.store) {
+      return;
+    }
+    try {
+      const saved = AppState.store.getSync(AppState.FEEDBACKS_KEY, '') as string;
+      if (saved.length === 0) {
+        return;
+      }
+      const parsed = JSON.parse(saved) as FeedbackRecord[];
+      if (Array.isArray(parsed)) {
+        AppState.feedbacks = parsed;
+      }
+    } catch (err) {
+    }
+  }
+
+  private static persistSettings(): void {
+    AppState.persistString(AppState.SETTINGS_KEY, JSON.stringify(AppState.settings));
+  }
+
+  private static persistFeedbacks(): void {
+    AppState.persistString(AppState.FEEDBACKS_KEY, JSON.stringify(AppState.feedbacks));
+  }
+
+  private static persistString(key: string, value: string): void {
+    if (!AppState.store) {
+      return;
+    }
+    try {
+      AppState.store.putSync(key, value);
+      AppState.store.flush();
+    } catch (err) {
+    }
   }
 
   private static findUserByPhone(phone: string): StoredUser | null {

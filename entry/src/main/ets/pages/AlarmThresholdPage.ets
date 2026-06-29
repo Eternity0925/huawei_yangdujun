@@ -1,4 +1,5 @@
-import { promptAction, router } from '@kit.ArkUI';
+import { promptAction } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { Greenhouse, ThresholdConfig } from '../models/AppModels';
 import { AppService } from '../services/AppService';
 
@@ -49,7 +50,6 @@ struct AlarmThresholdPage {
       { key: 'soilTemp', title: '土壤温度', min: this.threshold.soilTempMin, max: this.threshold.soilTempMax, unit: '℃' },
       { key: 'soilHum', title: '土壤湿度', min: this.threshold.humMin, max: this.threshold.humMax, unit: '%' },
       { key: 'co2', title: '二氧化碳浓度', min: this.threshold.co2Min, max: this.threshold.co2Max, unit: 'ppm' },
-      { key: 'o2', title: '氧气浓度', min: this.threshold.o2Min, max: this.threshold.o2Max, unit: '%' },
       { key: 'ph', title: 'PH值', min: this.threshold.phMin, max: this.threshold.phMax, unit: '' },
       { key: 'light', title: '光照强度', min: this.threshold.lightMin, max: this.threshold.lightMax, unit: 'lux' }
     ];
@@ -107,12 +107,6 @@ struct AlarmThresholdPage {
         t.co2Min += delta;
       } else {
         t.co2Max += delta;
-      }
-    } else if (key === 'o2') {
-      if (isMin) {
-        t.o2Min += delta;
-      } else {
-        t.o2Max += delta;
       }
     } else if (key === 'ph') {
       if (isMin) {
@@ -177,10 +171,7 @@ struct AlarmThresholdPage {
 
   build() {
     Column({ space: 12 }) {
-      Row() {
-        Text('<').fontSize(22).fontColor('#238B45').onClick(() => router.back())
-        Text('阈值设置').fontSize(24).fontWeight(FontWeight.Bold).fontColor('#143D2A').margin({ left: 12 })
-      }.width('100%')
+      AndroidBackTopBar({ title: '阈值设置' })
 
       Select(this.greenhouseOptions())
         .selected(this.selectedIndex)
@@ -212,7 +203,7 @@ struct AlarmThresholdPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18 })
-    .backgroundColor('#F6FBF6')
+    .padding({ left: 16, right: 16, top: 10 })
+    .backgroundColor('#E9F2E6')
   }
 }

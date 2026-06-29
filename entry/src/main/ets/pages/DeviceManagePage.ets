@@ -1,4 +1,5 @@
 import { router } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { AppRoutes } from '../common/AppRoutes';
 import { Device, Greenhouse } from '../models/AppModels';
 import { AppService } from '../services/AppService';
@@ -35,7 +36,7 @@ struct DeviceManagePage {
 
   build() {
     Column({ space: 12 }) {
-      this.Header('设备管理')
+      AndroidBackTopBar({ title: '设备管理' })
 
       Select(this.greenhouseOptions())
         .selected(this.selectedIndex)
@@ -71,20 +72,13 @@ struct DeviceManagePage {
         .width('100%')
         .padding(16)
         .backgroundColor(Color.White)
-        .borderRadius(8)
+        .borderRadius(14)
+        .shadow({ radius: 2, color: '#18000000', offsetX: 0, offsetY: 1 })
       }, (item: Device) => item.id)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18 })
-    .backgroundColor('#F6FBF6')
-  }
-
-  @Builder
-  Header(title: string) {
-    Row() {
-      Text('<').fontSize(22).fontColor('#238B45').onClick(() => router.back())
-      Text(title).fontSize(24).fontWeight(FontWeight.Bold).fontColor('#143D2A').margin({ left: 12 })
-    }.width('100%')
+    .padding({ left: 16, right: 16, top: 10 })
+    .backgroundColor('#E9F2E6')
   }
 }

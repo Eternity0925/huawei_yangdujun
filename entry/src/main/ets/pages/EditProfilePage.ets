@@ -8,14 +8,12 @@ import { User } from '../models/AppModels';
 struct EditProfilePage {
   @State nickname: string = '';
   @State phone: string = '';
-  @State token: string = '';
 
   aboutToAppear(): void {
     const user: User | null = AppService.getCurrentUser();
     if (user) {
       this.nickname = user.nickname;
       this.phone = user.phone;
-      this.token = user.token;
     }
   }
 
@@ -57,33 +55,35 @@ struct EditProfilePage {
       Column() {
         Row() {
           Text('<')
-            .width(40)
-            .height(40)
+            .width(42)
+            .height(42)
             .fontSize(24)
             .fontColor(Color.White)
+            .fontWeight(FontWeight.Bold)
             .textAlign(TextAlign.Center)
-            .backgroundColor('#98C186')
-            .borderRadius(20)
-            .margin({ left: 16 })
+            .backgroundColor('#6F9F62')
+            .borderRadius(21)
             .onClick(() => router.back())
           Text('编辑个人信息')
             .layoutWeight(1)
-            .fontSize(18)
+            .fontSize(21)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
             .textAlign(TextAlign.Center)
           Text('保存')
+            .width(42)
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
-            .margin({ right: 20 })
+            .textAlign(TextAlign.Center)
             .onClick(() => this.save())
         }
-        .height(70)
         .width('100%')
-        .backgroundColor(AndroidColor.GREEN_SOFT)
-        .borderRadius(30)
-        .shadow({ radius: 8, color: '#33000000', offsetX: 0, offsetY: 3 })
+        .height(62)
+        .padding({ left: 14, right: 14 })
+        .backgroundColor(AndroidColor.GREEN_HEADER)
+        .borderRadius(14)
+        .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
         .margin({ bottom: 20 })
 
         Scroll() {
@@ -132,23 +132,11 @@ struct EditProfilePage {
                 .backgroundColor('#F8FCF7')
                 .margin({ top: 6 })
 
-              Blank().height(16)
-              this.Label('用户令牌 (Token)')
-              Text(this.token)
-                .width('100%')
-                .height(60)
-                .fontSize(13)
-                .fontColor('#7A9A71')
-                .maxLines(2)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .padding({ left: 16, right: 16, top: 12 })
-                .backgroundColor('#F8FCF7')
-                .margin({ top: 6 })
             }
             .width('100%')
             .padding(24)
             .backgroundColor(Color.White)
-            .borderRadius(30)
+            .borderRadius(14)
             .shadow({ radius: 4, color: '#22000000', offsetX: 0, offsetY: 2 })
             .margin({ bottom: 40 })
           }

@@ -1,0 +1,280 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #E9F2E6;
+      font-family: -apple-system, BlinkMacSystemFont, "HarmonyOS Sans", "Segoe UI", sans-serif;
+      color: #143D2A;
+    }
+    #root {
+      padding: 0 0 18px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      margin: 0 0 16px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
+    }
+    .title {
+      color: #5A8C62;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: #667085;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 220px;
+      background: #F8FBF8;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    function cssColor(hex, alpha) {
+      if (!hex || hex.charAt(0) !== '#') return hex;
+      var h = hex.substring(1);
+      var r = parseInt(h.substring(0, 2), 16);
+      var g = parseInt(h.substring(2, 4), 16);
+      var b = parseInt(h.substring(4, 6), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    function roundedRect(ctx, x, y, w, h, r) {
+      var rr = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + w - rr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x, y + h);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
+    }
+
+    function pointsFor(series, labels, min, max, left, top, width, height) {
+      var denom = Math.max(1, max - min);
+      var count = Math.max(1, labels.length - 1);
+      return series.data.map(function (value, index) {
+        var x = left + (width * index / count);
+        var y = top + height - ((value - min) / denom) * height;
+        return { x: x, y: Math.max(top, Math.min(top + height, y)), value: value };
+      });
+    }
+
+    function drawSpline(ctx, points, color, fill, baseY) {
+      if (!points.length) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (var i = 0; i < points.length - 1; i++) {
+        var p = points[i];
+        var n = points[i + 1];
+        var cx = (p.x + n.x) / 2;
+        ctx.bezierCurveTo(cx, p.y, cx, n.y, n.x, n.y);
+      }
+      if (fill) {
+        ctx.lineTo(points[points.length - 1].x, baseY);
+        ctx.lineTo(points[0].x, baseY);
+        ctx.closePath();
+        ctx.fillStyle = cssColor(color, 0.18);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (var j = 0; j < points.length - 1; j++) {
+        var a = points[j];
+        var b = points[j + 1];
+        var c = (a.x + b.x) / 2;
+        ctx.bezierCurveTo(c, a.y, c, b.y, b.x, b.y);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      points.forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.8, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      });
+    }
+
+    function drawChart(canvas, chart, progress) {
+      var dpr = window.devicePixelRatio || 1;
+      var rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      var ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var w = rect.width;
+      var h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      var left = 34;
+      var right = 12;
+      var top = 16;
+      var bottom = 28;
+      var width = w - left - right;
+      var height = h - top - bottom;
+      var labels = chart.labels || [];
+      var series = chart.series || [];
+      var values = [];
+      series.forEach(function (s) { values = values.concat(s.data || []); });
+      var min = chart.min !== undefined ? chart.min : Math.min.apply(null, values);
+      var max = chart.max !== undefined ? chart.max : Math.max.apply(null, values);
+      if (!isFinite(min) || !isFinite(max) || min === max) {
+        min = 0;
+        max = 1;
+      }
+
+      ctx.fillStyle = '#F8FBF8';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#E2ECE2';
+      ctx.lineWidth = 1;
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = '#8A948A';
+      for (var i = 0; i <= 4; i++) {
+        var y = top + height * i / 4;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + width, y);
+        ctx.stroke();
+        var labelValue = max - (max - min) * i / 4;
+        ctx.fillText(String(Math.round(labelValue * 10) / 10), 3, y + 3);
+      }
+      ctx.strokeStyle = '#D5E4D5';
+      ctx.beginPath();
+      ctx.moveTo(left, top);
+      ctx.lineTo(left, top + height);
+      ctx.lineTo(left + width, top + height);
+      ctx.stroke();
+
+      var skip = labels.length > 10 ? Math.ceil(labels.length / 5) : 1;
+      labels.forEach(function (label, index) {
+        if (index % skip !== 0) return;
+        var x = left + width * index / Math.max(1, labels.length - 1);
+        ctx.fillStyle = '#8A948A';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, h - 9);
+      });
+      ctx.textAlign = 'left';
+
+      if (chart.type === 'column') {
+        var groupWidth = width / Math.max(1, labels.length);
+        var barWidth = Math.max(4, Math.min(16, groupWidth / (series.length + 1)));
+        labels.forEach(function (_, index) {
+          series.forEach(function (s, si) {
+            var value = (s.data || [])[index] || 0;
+            var ratio = Math.max(0, Math.min(1, (value - min) / Math.max(1, max - min))) * progress;
+            var barH = height * ratio;
+            var x = left + groupWidth * index + (groupWidth - barWidth * series.length) / 2 + si * barWidth;
+            var y = top + height - barH;
+            roundedRect(ctx, x, y, barWidth - 1, barH, 4);
+            ctx.fillStyle = s.color;
+            ctx.fill();
+          });
+        });
+        return;
+      }
+
+      series.forEach(function (s) {
+        var clipped = {
+          data: (s.data || []).map(function (value) {
+            return min + (value - min) * progress;
+          })
+        };
+        var pts = pointsFor(clipped, labels, min, max, left, top, width, height);
+        drawSpline(ctx, pts, s.color, chart.type === 'area', top + height);
+      });
+    }
+
+    function makeCard(chart) {
+      var card = document.createElement('section');
+      card.className = 'card';
+      var title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = '● ' + chart.title;
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var legend = document.createElement('div');
+      legend.className = 'legend';
+      (chart.series || []).forEach(function (s) {
+        var item = document.createElement('span');
+        item.className = 'legend-item';
+        var dot = document.createElement('span');
+        dot.className = 'dot';
+        dot.style.backgroundColor = s.color;
+        item.appendChild(dot);
+        item.appendChild(document.createTextNode(s.name));
+        legend.appendChild(item);
+      });
+      meta.appendChild(legend);
+      var canvas = document.createElement('canvas');
+      card.appendChild(title);
+      card.appendChild(meta);
+      card.appendChild(canvas);
+      return { card: card, canvas: canvas };
+    }
+
+    window.renderAACharts = function (config) {
+      var root = document.getElementById('root');
+      root.innerHTML = '';
+      var charts = config.charts || [];
+      var canvases = [];
+      charts.forEach(function (chart) {
+        var built = makeCard(chart);
+        root.appendChild(built.card);
+        canvases.push({ canvas: built.canvas, chart: chart });
+      });
+      var start = Date.now();
+      function tick() {
+        var p = Math.min(1, (Date.now() - start) / 560);
+        var eased = 1 - Math.pow(1 - p, 3);
+        canvases.forEach(function (item) { drawChart(item.canvas, item.chart, eased); });
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      tick();
+      window.onresize = function () {
+        canvases.forEach(function (item) { drawChart(item.canvas, item.chart, 1); });
+      };
+    };
+  </script>
+</body>
+</html>

@@ -6,9 +6,9 @@ import { AppService } from '../services/AppService';
 @Entry
 @Component
 struct LoginPage {
-  @State phone: string = '';
-  @State password: string = '';
-  @State agreed: boolean = false;
+  @State phone: string = '13800138000';
+  @State password: string = 'abc12345';
+  @State agreed: boolean = true;
 
   private async submit(): Promise<void> {
     const ok = await AppService.login(this.phone, this.password);
@@ -23,15 +23,15 @@ struct LoginPage {
   InputRow(label: string, placeholder: string, isPassword: boolean) {
     Row() {
       Text(label)
-        .fontSize(18)
+        .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor(AndroidColor.GREEN_LABEL)
-        .margin({ right: 12 })
+        .margin({ right: 14 })
 
-      TextInput({ placeholder })
+      TextInput({ placeholder, text: isPassword ? this.password : this.phone })
         .layoutWeight(1)
         .height(48)
-        .fontSize(16)
+        .fontSize(15)
         .fontColor(AndroidColor.GREEN_LABEL)
         .placeholderColor(AndroidColor.GREEN_HINT)
         .backgroundColor(Color.Transparent)
@@ -43,16 +43,10 @@ struct LoginPage {
             this.phone = value;
           }
         })
-
-      if (isPassword) {
-        Text('显')
-          .fontSize(16)
-          .fontColor(AndroidColor.GREEN_HINT)
-      }
     }
     .width('100%')
-    .height(56)
-    .padding({ left: 16, right: 16 })
+    .height(54)
+    .padding({ left: 18, right: 18 })
     .backgroundColor(AndroidColor.INPUT_BG)
   }
 
@@ -79,22 +73,22 @@ struct LoginPage {
             .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor(AndroidColor.GREEN_TEXT)
-            .margin({ bottom: 25 })
+            .margin({ bottom: 22 })
 
           Image($r('app.media.image_14'))
-            .width(120)
-            .height(135)
+            .width(112)
+            .height(112)
             .objectFit(ImageFit.Contain)
-            .borderRadius(20)
-            .shadow({ radius: 10, color: '#33000000', offsetX: 0, offsetY: 4 })
+            .borderRadius(22)
+            .shadow({ radius: 8, color: '#22000000', offsetX: 0, offsetY: 3 })
 
           Column() {
             this.InputRow('+86', '请输入手机号', false)
 
-            Row() {
+            Column() {
               this.InputRow('密码', '请输入密码', true)
             }
-            .margin({ top: 16 })
+            .margin({ top: 12 })
 
             Row() {
               Button('忘记密码')
@@ -102,26 +96,26 @@ struct LoginPage {
                 .fontSize(14)
                 .fontColor('#5A7153')
                 .backgroundColor('#DFEFE0')
-                .padding(8)
+                .padding({ left: 10, right: 10, top: 7, bottom: 7 })
                 .onClick(() => router.pushUrl({ url: AppRoutes.NEW_PASSWORD }))
 
               Divider()
                 .vertical(true)
                 .height(12)
                 .color(AndroidColor.PAGE_BG)
-                .margin({ left: 15, right: 15 })
+                .margin({ left: 14, right: 14 })
 
               Button('注册账号')
                 .type(ButtonType.Normal)
                 .fontSize(14)
                 .fontColor('#5A7153')
                 .backgroundColor('#DFEFE0')
-                .padding(8)
+                .padding({ left: 10, right: 10, top: 7, bottom: 7 })
                 .onClick(() => router.pushUrl({ url: AppRoutes.REGISTER }))
             }
             .width('100%')
             .justifyContent(FlexAlign.Center)
-            .margin({ top: 12 })
+            .margin({ top: 14 })
 
             Row() {
               Checkbox()
@@ -131,11 +125,11 @@ struct LoginPage {
               Text('我已阅读并同意《用户协议》《隐私政策》')
                 .fontSize(12)
                 .fontColor(AndroidColor.GREEN_HINT)
-                .margin({ left: 4 })
+                .margin({ left: 6 })
             }
             .justifyContent(FlexAlign.Center)
             .width('100%')
-            .margin({ top: 20 })
+            .margin({ top: 18 })
 
             Button('登录')
               .width('100%')
@@ -149,14 +143,14 @@ struct LoginPage {
               .onClick(() => this.submit())
           }
           .width('100%')
-          .padding(25)
+          .padding({ left: 24, right: 24, top: 28, bottom: 28 })
           .backgroundColor(Color.White)
-          .borderRadius(28)
-          .shadow({ radius: 6, color: '#33000000', offsetX: 0, offsetY: 3 })
-          .margin({ left: 25, right: 25, top: 30 })
+          .borderRadius(14)
+          .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
+          .margin({ left: 24, right: 24, top: 28 })
         }
         .width('100%')
-        .padding({ top: 30, bottom: 30 })
+        .padding({ top: 34, bottom: 30 })
         .alignItems(HorizontalAlign.Center)
       }
       .width('100%')

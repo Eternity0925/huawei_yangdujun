@@ -1,4 +1,5 @@
 import { promptAction, router } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { AndroidColor } from '../common/AndroidStyle';
 import { AppRoutes } from '../common/AppRoutes';
 import { AppService } from '../services/AppService';
@@ -112,31 +113,7 @@ struct RegisterPage {
         .position({ x: -80, y: -50 })
 
       Column() {
-        Row() {
-          Stack() {
-            Text('<')
-              .fontSize(24)
-              .fontColor(AndroidColor.GREEN_DARK)
-              .textAlign(TextAlign.Center)
-          }
-          .width(48)
-          .height(48)
-          .backgroundColor(Color.White)
-          .borderRadius(24)
-          .shadow({ radius: 2, color: '#22000000', offsetX: 0, offsetY: 1 })
-          .onClick(() => router.back())
-
-          Text('注册账号')
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AndroidColor.GREEN_TEXT)
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-
-          Blank()
-            .width(48)
-        }
-        .height(72)
+        AndroidBackTopBar({ title: '注册账号' })
         .padding({ left: 16, right: 16 })
         .margin({ top: 8 })
 
@@ -209,7 +186,7 @@ struct RegisterPage {
             .width('100%')
             .padding({ left: 24, right: 24, top: 28, bottom: 28 })
             .backgroundColor(Color.White)
-            .borderRadius(24)
+            .borderRadius(14)
             .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
             .margin({ left: 24, right: 24 })
           }

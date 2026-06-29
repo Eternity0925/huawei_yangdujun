@@ -1,26 +1,19 @@
-import { router } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { SettingItem } from '../models/AppModels';
-import { AppState } from '../storage/AppState';
+import { AppService } from '../services/AppService';
 
 @Entry
 @Component
 struct SettingsPage {
-  @State settings: SettingItem[] = AppState.settings;
+  @State settings: SettingItem[] = AppService.getSettings();
+
+  aboutToAppear(): void {
+    this.settings = AppService.getSettings();
+  }
 
   build() {
     Column({ space: 12 }) {
-      Row() {
-        Text('<')
-          .fontSize(22)
-          .fontColor('#238B45')
-          .onClick(() => router.back())
-        Text('应用设置')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#143D2A')
-          .margin({ left: 12 })
-      }
-      .width('100%')
+      AndroidBackTopBar({ title: '应用设置' })
 
       ForEach(this.settings, (item: SettingItem, index: number) => {
         Row() {
@@ -38,18 +31,19 @@ struct SettingsPage {
             .selectedColor('#238B45')
             .onChange((value: boolean) => {
               this.settings[index].enabled = value;
-              AppState.settings[index].enabled = value;
+              AppService.updateSetting(item.id, value);
             })
         }
         .width('100%')
         .padding(16)
         .backgroundColor(Color.White)
-        .borderRadius(8)
+        .borderRadius(14)
+        .shadow({ radius: 2, color: '#18000000', offsetX: 0, offsetY: 1 })
       }, (item: SettingItem) => item.id)
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18 })
-    .backgroundColor('#F6FBF6')
+    .padding({ left: 16, right: 16, top: 10 })
+    .backgroundColor('#E9F2E6')
   }
 }

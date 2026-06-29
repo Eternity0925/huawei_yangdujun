@@ -140,6 +140,11 @@ export class AppService {
     return AppState.alarms.filter((alarm: AlarmRecord) => alarm.greenhouseId === greenhouseId);
   }
 
+  static getAlarmById(alarmId: string): AlarmRecord | null {
+    const alarm = AppState.alarms.find((item: AlarmRecord) => item.id === alarmId);
+    return alarm || null;
+  }
+
   static handleAlarm(alarmId: string): boolean {
     const user = AppState.currentUser;
     return AppState.handleAlarm(alarmId, user ? user.nickname : '未知用户');
@@ -162,10 +167,11 @@ export class AppService {
   }
 
   static updateSetting(id: string, enabled: boolean): void {
-    const setting = AppState.settings.find((item: SettingItem) => item.id === id);
-    if (setting) {
-      setting.enabled = enabled;
-    }
+    AppState.updateSetting(id, enabled);
+  }
+
+  static submitFeedback(content: string): boolean {
+    return AppState.addFeedback(content);
   }
 
   static buildAiPrompt(greenhouse: Greenhouse, data: SensorData): string {
@@ -175,13 +181,10 @@ export class AppService {
 大棚ID：${greenhouse.id}
 大棚名称：${greenhouse.name}
 生长阶段：${greenhouse.stage}
-空气温度：${data.airTemperature}℃
-空气湿度：${data.airHumidity}%
-土壤温度：${data.soilTemperature}℃
-土壤湿度：${data.soilHumidity}%
+空气温度：${data.airTemperature}℃，空气湿度：${data.airHumidity}%
+土壤温度：${data.soilTemperature}℃，土壤湿度：${data.soilHumidity}%
 光照：${data.light}lux
 CO2：${data.co2}ppm
-O2：${data.o2}%
 pH：${data.ph}
 风机档位：${data.fanGear}
 灯：${data.lightOn ? 'ON' : 'OFF'}
@@ -226,7 +229,7 @@ pH：${data.ph}
   }
 
   private static syncDevicesFromSensor(greenhouseId: string, data: SensorData): void {
-    AppService.upsertDevice(greenhouseId, 'light_1', '灯', 'light', data.lightOn ? 'ON' : 'OFF', data.lightOn);
+    AppService.upsertDevice(greenhouseId, 'light_1', '灯泡', 'light', data.lightOn ? 'ON' : 'OFF', data.lightOn);
     AppService.upsertDevice(greenhouseId, 'board_1', '挡光板', 'board', data.boardOn ? 'ON' : 'OFF', data.boardOn);
     AppService.upsertDevice(greenhouseId, 'fan_1', '风机', 'fan', `${data.fanGear}档`, data.fanGear > 0);
     AppService.upsertDevice(greenhouseId, 'water_pump_1', '水泵', 'water', data.waterPumpOn ? 'ON' : 'OFF', data.waterPumpOn);

@@ -1,4 +1,5 @@
 import { promptAction, router } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { AndroidColor } from '../common/AndroidStyle';
 import { AppRoutes } from '../common/AppRoutes';
 import { AppService } from '../services/AppService';
@@ -8,7 +9,6 @@ import { AppService } from '../services/AppService';
 struct NewPasswordPage {
   @State phone: string = '';
   @State password: string = '';
-  @State showPassword: boolean = false;
 
   private isAllLetterOrDigit(value: string): boolean {
     let isAllLetter = true;
@@ -50,6 +50,37 @@ struct NewPasswordPage {
     router.replaceUrl({ url: AppRoutes.LOGIN });
   }
 
+  @Builder
+  InputRow(label: string, placeholder: string, isPassword: boolean) {
+    Row() {
+      Text(label)
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AndroidColor.GREEN_LABEL)
+        .margin({ right: 14 })
+
+      TextInput({ placeholder })
+        .layoutWeight(1)
+        .height(48)
+        .fontSize(15)
+        .fontColor(AndroidColor.GREEN_LABEL)
+        .placeholderColor(AndroidColor.GREEN_HINT)
+        .backgroundColor(Color.Transparent)
+        .type(isPassword ? InputType.Password : InputType.PhoneNumber)
+        .onChange((value: string) => {
+          if (isPassword) {
+            this.password = value;
+          } else {
+            this.phone = value;
+          }
+        })
+    }
+    .width('100%')
+    .height(54)
+    .padding({ left: 18, right: 18 })
+    .backgroundColor(AndroidColor.INPUT_BG)
+  }
+
   build() {
     Stack() {
       Image($r('app.media.image_9'))
@@ -66,86 +97,32 @@ struct NewPasswordPage {
         .position({ x: 170, y: 610 })
 
       Column() {
-        Row() {
-          Text('<')
-            .width(40)
-            .height(40)
-            .fontSize(24)
-            .fontColor(AndroidColor.GREEN_DARK)
-            .textAlign(TextAlign.Center)
-            .backgroundColor(Color.White)
-            .borderRadius(20)
-            .shadow({ radius: 2, color: '#22000000', offsetX: 0, offsetY: 1 })
-            .onClick(() => router.replaceUrl({ url: AppRoutes.LOGIN }))
-          Text('找回密码')
-            .layoutWeight(1)
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AndroidColor.GREEN_TEXT)
-            .textAlign(TextAlign.Center)
-          Blank().width(40)
-        }
-        .height(64)
+        AndroidBackTopBar({ title: '找回密码' })
         .padding({ left: 16, right: 16 })
-        .margin({ top: 20 })
+        .margin({ top: 8 })
 
         Scroll() {
           Column() {
             Image($r('app.media.image_14'))
-              .width(140)
-              .height(125)
+              .width(112)
+              .height(112)
               .objectFit(ImageFit.Contain)
-              .borderRadius(20)
-              .shadow({ radius: 12, color: '#33000000', offsetX: 0, offsetY: 4 })
-              .margin({ bottom: 30 })
+              .borderRadius(22)
+              .shadow({ radius: 8, color: '#22000000', offsetX: 0, offsetY: 3 })
+              .margin({ top: 8, bottom: 22 })
 
             Column() {
-              Row() {
-                Text('+86')
-                  .fontSize(18)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(AndroidColor.GREEN_LABEL)
-                  .margin({ right: 12 })
-                TextInput({ placeholder: '手机号' })
-                  .layoutWeight(1)
-                  .height(48)
-                  .fontSize(16)
-                  .fontColor(AndroidColor.GREEN_LABEL)
-                  .placeholderColor(AndroidColor.GREEN_HINT)
-                  .backgroundColor(Color.Transparent)
-                  .type(InputType.PhoneNumber)
-                  .onChange((value: string) => this.phone = value)
-                Text('号').fontSize(16).fontColor(AndroidColor.GREEN_DARK)
-              }
-              .height(56)
-              .padding({ left: 16, right: 16 })
-              .backgroundColor(AndroidColor.INPUT_BG)
+              this.InputRow('+86', '手机号', false)
 
-              Row() {
-                TextInput({ placeholder: '新密码' })
-                  .layoutWeight(1)
-                  .height(48)
-                  .fontSize(16)
-                  .fontColor(AndroidColor.GREEN_LABEL)
-                  .placeholderColor(AndroidColor.GREEN_HINT)
-                  .backgroundColor(Color.Transparent)
-                  .type(this.showPassword ? InputType.Normal : InputType.Password)
-                  .onChange((value: string) => this.password = value)
-                Text(this.showPassword ? '隐' : '显')
-                  .fontSize(16)
-                  .fontColor(AndroidColor.GREEN_HINT)
-                  .onClick(() => this.showPassword = !this.showPassword)
+              Column() {
+                this.InputRow('密码', '新密码', true)
               }
-              .height(56)
-              .padding({ left: 16, right: 16 })
-              .backgroundColor(AndroidColor.INPUT_BG)
-              .margin({ top: 16 })
+              .margin({ top: 12 })
 
               Text('至少8个字符，不能全是字母或数字')
                 .fontSize(12)
-                .fontStyle(FontStyle.Italic)
-                .fontColor(AndroidColor.GREEN_DARK)
-                .margin({ top: 12, left: 4 })
+                .fontColor('#4F8A56')
+                .margin({ top: 8, left: 36 })
                 .width('100%')
 
               Button('确认更改')
@@ -156,19 +133,19 @@ struct NewPasswordPage {
                 .fontColor(Color.White)
                 .backgroundColor(AndroidColor.GREEN_DARK)
                 .borderRadius(27)
-                .margin({ top: 24 })
+                .margin({ top: 22 })
                 .onClick(() => this.submit())
             }
             .width('100%')
-            .padding(25)
+            .padding({ left: 24, right: 24, top: 28, bottom: 28 })
             .backgroundColor(Color.White)
-            .borderRadius(28)
-            .shadow({ radius: 6, color: '#33000000', offsetX: 0, offsetY: 3 })
-            .margin({ left: 25, right: 25 })
+            .borderRadius(14)
+            .shadow({ radius: 5, color: '#22000000', offsetX: 0, offsetY: 2 })
+            .margin({ left: 24, right: 24 })
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
-          .padding({ top: 20 })
+          .padding({ bottom: 30 })
         }
         .layoutWeight(1)
       }

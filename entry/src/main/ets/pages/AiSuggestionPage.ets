@@ -1,4 +1,5 @@
-import { promptAction, router } from '@kit.ArkUI';
+import { promptAction } from '@kit.ArkUI';
+import { AndroidBackTopBar } from '../common/AndroidWidgets';
 import { AppService } from '../services/AppService';
 
 @Entry
@@ -27,19 +28,8 @@ struct AiSuggestionPage {
 
   build() {
     Column() {
-      Row() {
-        Text('<')
-          .fontSize(22)
-          .fontColor('#238B45')
-          .onClick(() => router.back())
-        Text('AI 种植助手')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#143D2A')
-          .margin({ left: 12 })
-      }
-      .width('100%')
-      .height(56)
+      AndroidBackTopBar({ title: 'AI 种植助手' })
+        .margin({ bottom: 12 })
 
       Scroll() {
         Column({ space: 12 }) {
@@ -100,7 +90,7 @@ struct AiSuggestionPage {
             .width('100%')
             .padding(14)
             .backgroundColor(Color.White)
-            .borderRadius(8)
+            .borderRadius(14)
           }
 
           Column({ space: 8 }) {
@@ -118,7 +108,7 @@ struct AiSuggestionPage {
           .width('100%')
           .padding(14)
           .backgroundColor(Color.White)
-          .borderRadius(8)
+          .borderRadius(14)
         }
         .width('100%')
       }
@@ -126,7 +116,7 @@ struct AiSuggestionPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, top: 18, bottom: 16 })
-    .backgroundColor('#F6FBF6')
+    .padding({ left: 16, right: 16, top: 10, bottom: 16 })
+    .backgroundColor('#E9F2E6')
   }
 }

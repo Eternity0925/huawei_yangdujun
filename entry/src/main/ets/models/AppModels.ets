@@ -63,6 +63,13 @@ export interface SettingItem {
   enabled: boolean;
 }
 
+export interface FeedbackRecord {
+  id: string;
+  content: string;
+  createdAt: string;
+  userPhone: string;
+}
+
 export interface ThresholdConfig {
   tempMin: number;
   tempMax: number;
