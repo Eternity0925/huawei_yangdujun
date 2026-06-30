@@ -51,9 +51,13 @@ export class SecureIntegrationService {
       sensor,
       prompt
     };
-    const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.AI_SUGGESTION_PATH, JSON.stringify(request));
-    const result = JSON.parse(raw) as AiSuggestionResponse;
-    return result.suggestion || SecureIntegrationService.localAiSuggestion(greenhouse, sensor);
+    try {
+      const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.AI_SUGGESTION_PATH, JSON.stringify(request));
+      const result = JSON.parse(raw) as AiSuggestionResponse;
+      return result.suggestion || SecureIntegrationService.localAiSuggestion(greenhouse, sensor);
+    } catch (err) {
+      return SecureIntegrationService.localAiSuggestion(greenhouse, sensor);
+    }
   }
 
   static async requestAiChat(text: string, history: string): Promise<string> {
@@ -62,9 +66,13 @@ export class SecureIntegrationService {
     }
 
     const request: AiTextRequest = { text, history };
-    const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.AI_CHAT_PATH, JSON.stringify(request));
-    const result = JSON.parse(raw) as AiTextResponse;
-    return result.answer || 'AI 暂未返回有效回答，请稍后重试。';
+    try {
+      const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.AI_CHAT_PATH, JSON.stringify(request));
+      const result = JSON.parse(raw) as AiTextResponse;
+      return result.answer || 'AI 暂未返回有效回答，请稍后重试。';
+    } catch (err) {
+      return 'AI 服务暂时不可用，请稍后重试。';
+    }
   }
 
   static async sendHuaweiIoTCommand(command: DeviceCommand): Promise<boolean> {
@@ -72,9 +80,13 @@ export class SecureIntegrationService {
       return true;
     }
 
-    const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.HUAWEI_IOT_COMMAND_PATH, JSON.stringify(command));
-    const result = JSON.parse(raw) as SuccessResponse;
-    return result.success;
+    try {
+      const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.HUAWEI_IOT_COMMAND_PATH, JSON.stringify(command));
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
+    }
   }
 
   static async fetchHuaweiIoTShadow(greenhouseId: string): Promise<ShadowResponse> {
@@ -82,11 +94,16 @@ export class SecureIntegrationService {
       return { success: false };
     }
 
-    const raw = await SecureIntegrationService.postJson(
-      SecureEndpointConfig.HUAWEI_IOT_SHADOW_PATH,
-      JSON.stringify({ greenhouseId })
-    );
-    return JSON.parse(raw) as ShadowResponse;
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.HUAWEI_IOT_SHADOW_PATH,
+        JSON.stringify({ greenhouseId })
+      );
+      const result = JSON.parse(raw) as ShadowResponse;
+      return result.success === true ? result : { success: false };
+    } catch (err) {
+      return { success: false };
+    }
   }
 
   static async recognizeSpeechBase64(audioBase64: string): Promise<string> {
@@ -94,12 +111,16 @@ export class SecureIntegrationService {
       return '语音识别后端未配置';
     }
 
-    const raw = await SecureIntegrationService.postJson(
-      SecureEndpointConfig.HUAWEI_ASR_PATH,
-      JSON.stringify({ audioBase64 })
-    );
-    const result = JSON.parse(raw) as AiTextResponse;
-    return result.answer || '';
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.HUAWEI_ASR_PATH,
+        JSON.stringify({ audioBase64 })
+      );
+      const result = JSON.parse(raw) as AiTextResponse;
+      return result.answer || '';
+    } catch (err) {
+      return '';
+    }
   }
 
   static async getBaiduMapToken(): Promise<string> {
@@ -107,9 +128,13 @@ export class SecureIntegrationService {
       return '';
     }
 
-    const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.BAIDU_MAP_TOKEN_PATH, '{}');
-    const result = JSON.parse(raw) as TokenResponse;
-    return result.token;
+    try {
+      const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.BAIDU_MAP_TOKEN_PATH, '{}');
+      const result = JSON.parse(raw) as TokenResponse;
+      return result.token || '';
+    } catch (err) {
+      return '';
+    }
   }
 
   private static localAiSuggestion(greenhouse: Greenhouse, sensor: SensorData): string {
@@ -136,6 +161,8 @@ export class SecureIntegrationService {
       if (typeof response.result === 'string') {
         return response.result;
       }
+      return '{}';
+    } catch (err) {
       return '{}';
     } finally {
       request.destroy();

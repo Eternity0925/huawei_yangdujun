@@ -67,7 +67,13 @@ struct DeviceManagePage {
           Button('监控')
             .height(34)
             .backgroundColor('#238B45')
-            .onClick(() => router.pushUrl({ url: AppRoutes.DEVICE_MONITOR, params: { deviceId: item.id } }))
+            .onClick(() => router.pushUrl({
+              url: AppRoutes.DEVICE_MONITOR,
+              params: {
+                greenhouseId: item.greenhouseId,
+                deviceId: item.id
+              }
+            }))
         }
         .width('100%')
         .padding(16)

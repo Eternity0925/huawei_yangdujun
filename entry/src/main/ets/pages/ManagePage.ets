@@ -23,7 +23,11 @@ struct ManagePage {
     { icon: '🔔', title: '告警记录', tint: '#A8C69F', route: AppRoutes.ALARM_RECORD }
   ];
 
-  private alarms: AlarmRecord[] = AppService.getAlarms().slice(0, 5);
+  @State alarms: AlarmRecord[] = AppService.getAlarms().slice(0, 5);
+
+  aboutToAppear(): void {
+    this.alarms = AppService.getAlarms().slice(0, 5);
+  }
 
   private isHandled(item: AlarmRecord): boolean {
     return item.status.indexOf('已') >= 0;

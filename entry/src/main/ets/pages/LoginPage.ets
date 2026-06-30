@@ -11,6 +11,11 @@ struct LoginPage {
   @State agreed: boolean = true;
 
   private async submit(): Promise<void> {
+    if (!this.agreed) {
+      promptAction.showToast({ message: '请先同意用户协议与隐私政策' });
+      return;
+    }
+
     const ok = await AppService.login(this.phone, this.password);
     if (!ok) {
       promptAction.showToast({ message: '请输入手机号和密码' });

@@ -1,6 +1,6 @@
 export class SecureEndpointConfig {
   // 后端代理服务地址。DeepSeek、华为云、百度等 Key 只放在后端，不写入 HAP。
-  static readonly API_BASE_URL: string = '';
+  static readonly API_BASE_URL: string = 'http://192.168.43.65:8080';
 
   static readonly AI_CHAT_PATH: string = '/ai/chat';
   static readonly AI_SUGGESTION_PATH: string = '/ai/suggestion';

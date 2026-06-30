@@ -18,11 +18,46 @@ struct DeviceMonitorPage {
   private deviceNames: string[] = ['灯', '遮光板', '风扇', '水泵', '药泵'];
   private deviceIds: string[] = ['light_1', 'board_1', 'fan_1', 'water_pump_1', 'medicine_pump_1'];
 
+  aboutToAppear(): void {
+    const params = router.getParams() as Record<string, string>;
+    const greenhouseId = params && params.greenhouseId ? params.greenhouseId : '';
+    const fullDeviceId = params && params.deviceId ? params.deviceId : '';
+    this.applyRouteSelection(greenhouseId, fullDeviceId);
+  }
+
   private currentGreenhouse(): Greenhouse {
     if (this.greenhouseIndex >= 0 && this.greenhouseIndex < this.greenhouses.length) {
       return this.greenhouses[this.greenhouseIndex];
     }
     return this.greenhouses[0];
+  }
+
+  private applyRouteSelection(greenhouseId: string, fullDeviceId: string): void {
+    if (greenhouseId.length > 0) {
+      const greenhouseIndex = this.greenhouses.findIndex((item: Greenhouse) => item.id === greenhouseId);
+      if (greenhouseIndex >= 0) {
+        this.greenhouseIndex = greenhouseIndex;
+      }
+    }
+
+    if (fullDeviceId.length > 0) {
+      const deviceId = this.toBaseDeviceId(fullDeviceId, this.currentGreenhouse().id);
+      const deviceIndex = this.deviceIds.indexOf(deviceId);
+      if (deviceIndex >= 0) {
+        this.deviceIndex = deviceIndex;
+      }
+    }
+
+    this.operateIndex = 0;
+    this.sensor = AppService.getSensorData(this.currentGreenhouse().id);
+  }
+
+  private toBaseDeviceId(fullDeviceId: string, greenhouseId: string): string {
+    const prefix = `${greenhouseId}-`;
+    if (fullDeviceId.indexOf(prefix) === 0) {
+      return fullDeviceId.substring(prefix.length);
+    }
+    return fullDeviceId;
   }
 
   private greenhouseNames(): string[] {

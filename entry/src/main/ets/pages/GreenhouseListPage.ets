@@ -7,7 +7,11 @@ import { AppService } from '../services/AppService';
 @Entry
 @Component
 struct GreenhouseListPage {
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
+
+  aboutToAppear(): void {
+    this.greenhouses = AppService.getGreenhouses();
+  }
 
   build() {
     Column({ space: 12 }) {
