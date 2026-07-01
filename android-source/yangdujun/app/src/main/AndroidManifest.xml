@@ -65,10 +65,6 @@
         <activity android:name=".AddGreenhouseActivity" android:exported="true" />
         <activity android:name=".FeedbackActivity" android:exported="true" />
         <activity android:name=".SettingsActivity" android:exported="true" />
-        <activity
-            android:name=".WeatherActivity"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
         <activity android:name=".EditProfileActivity" android:exported="true" />
     </application>
 

@@ -23,6 +23,7 @@ export interface SensorData {
   co2: number;
   o2: number;
   ph: number;
+  distance: number;
   fanGear: number;
   lightOn: boolean;
   boardOn: boolean;

@@ -16,7 +16,6 @@ export class AppRoutes {
   static readonly ALARM_THRESHOLD: string = 'pages/AlarmThresholdPage';
   static readonly REALTIME_ANALYSIS: string = 'pages/RealTimeAnalysisPage';
   static readonly HISTORY_ANALYSIS: string = 'pages/HistoryAnalysisPage';
-  static readonly WEATHER: string = 'pages/WeatherPage';
   static readonly VIDEO: string = 'pages/VideoPage';
   static readonly AI: string = 'pages/AiSuggestionPage';
   static readonly FEEDBACK: string = 'pages/FeedbackPage';

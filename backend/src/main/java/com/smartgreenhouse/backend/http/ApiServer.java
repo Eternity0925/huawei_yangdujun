@@ -1,6 +1,7 @@
 package com.smartgreenhouse.backend.http;
 
 import com.smartgreenhouse.backend.service.GreenhouseService;
+import com.smartgreenhouse.backend.service.HuaweiCloudService;
 import com.smartgreenhouse.backend.util.Json;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +16,7 @@ import java.util.concurrent.Executors;
 public class ApiServer {
     private final HttpServer server;
     private final GreenhouseService greenhouseService = new GreenhouseService();
+    private final HuaweiCloudService huaweiCloudService = new HuaweiCloudService();
 
     public ApiServer(int port) throws IOException {
         server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
@@ -59,16 +61,18 @@ public class ApiServer {
             if (handleCors(exchange)) {
                 return;
             }
-            String body = read(exchange);
-            String greenhouseId = Json.extractString(body, "greenhouseId", "default");
-            send(exchange, 200, greenhouseService.latestSensor(greenhouseId));
+            read(exchange);
+            send(exchange, 200, huaweiCloudService.latestShadow());
         });
 
         server.createContext("/iot/command", exchange -> {
             if (handleCors(exchange)) {
                 return;
             }
-            send(exchange, 200, "{\"success\":true}");
+            String body = read(exchange);
+            String commandName = Json.extractString(body, "commandName", "");
+            String value = Json.extractValue(body, "value", "");
+            send(exchange, 200, huaweiCloudService.sendCommand(commandName, value));
         });
 
         server.createContext("/ai/chat", exchange -> {
@@ -89,7 +93,9 @@ public class ApiServer {
             if (handleCors(exchange)) {
                 return;
             }
-            send(exchange, 200, "{\"answer\":\"\"}");
+            String body = read(exchange);
+            String audioBase64 = Json.extractString(body, "audioBase64", "");
+            send(exchange, 200, huaweiCloudService.recognizeSpeechBase64(audioBase64));
         });
 
         server.createContext("/map/baidu/token", exchange -> {

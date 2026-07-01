@@ -20,7 +20,6 @@ struct MinePage {
     { icon: '棚', title: '我的大棚', bg: '#E8F5E9', color: AndroidColor.GREEN_TEXT, route: AppRoutes.GREENHOUSE_LIST },
     { icon: '馈', title: '问题反馈', bg: '#FFF3E0', color: AndroidColor.GREEN_TEXT, route: AppRoutes.FEEDBACK },
     { icon: 'AI', title: 'AI助手', bg: '#E3F2FD', color: AndroidColor.GREEN_TEXT, route: AppRoutes.AI },
-    { icon: '天', title: '智能天气', bg: '#E0F7FA', color: AndroidColor.GREEN_TEXT, route: AppRoutes.WEATHER },
     { icon: '设', title: '设置', bg: '#F3E5F5', color: AndroidColor.GREEN_TEXT, route: AppRoutes.SETTINGS }
   ];
 

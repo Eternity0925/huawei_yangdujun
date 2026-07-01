@@ -26,14 +26,37 @@ $env:KINGBASE_USERNAME="system"
 $env:KINGBASE_PASSWORD="123456"
 ```
 
-## 3. Run
+## 3. Configure Huawei Cloud
+
+The HarmonyOS app calls this backend proxy. IoT data and commands use the `why`
+Huawei Cloud account by default, while voice ASR keeps a separate account that
+matches the original Android implementation.
+
+Optional overrides:
+
+```powershell
+$env:HUAWEI_IOT_USERNAME="why"
+$env:HUAWEI_IOT_PASSWORD="why123456"
+$env:HUAWEI_IOT_DOMAIN="why66665"
+$env:HUAWEI_IOT_PROJECT_NAME="cn-north-4"
+$env:HUAWEI_IOT_PROJECT_ID="0e7c5e04a662439c813433f94d7ad4e7"
+$env:HUAWEI_IOT_DEVICE_ID="6a3a6da1cbb0cf6bb96829a4_WHYwhy"
+$env:HUAWEI_IOT_SERVICE_ID="王昊洋"
+
+$env:HUAWEI_ASR_USERNAME="ydj_19test"
+$env:HUAWEI_ASR_PASSWORD="yzq20060408"
+$env:HUAWEI_ASR_DOMAIN="qiyu66"
+$env:HUAWEI_ASR_PROJECT_NAME="cn-north-4"
+```
+
+## 4. Run
 
 ```powershell
 cd E:\work\backend
 .\run.ps1
 ```
 
-## 4. Test
+## 5. Test
 
 ```powershell
 Invoke-RestMethod http://localhost:8080/health

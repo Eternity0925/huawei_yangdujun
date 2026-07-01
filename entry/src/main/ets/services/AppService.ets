@@ -65,6 +65,28 @@ export class AppService {
     return AppState.getSensorData(greenhouseId);
   }
 
+  static emptyCloudSensorData(): SensorData {
+    return {
+      airTemperature: -1,
+      airHumidity: -1,
+      soilTemperature: -1,
+      soilHumidity: -1,
+      light: -1,
+      co2: -1,
+      o2: -1,
+      ph: -1,
+      distance: -1,
+      fanGear: 0,
+      lightOn: false,
+      boardOn: false,
+      waterPumpOn: false,
+      medicinePumpOn: false,
+      aiWarning: '',
+      growthStage: 0,
+      updatedAt: ''
+    };
+  }
+
   static updateSensorData(greenhouseId: string, data: SensorData): void {
     AppState.updateSensorData(greenhouseId, data);
     AppService.syncDevicesFromSensor(greenhouseId, data);
@@ -75,8 +97,9 @@ export class AppService {
     if (shadow.success && shadow.sensor) {
       AppState.updateSensorData(greenhouseId, shadow.sensor);
       AppService.syncDevicesFromSensor(greenhouseId, shadow.sensor);
+      return AppState.getSensorData(greenhouseId);
     }
-    return AppState.getSensorData(greenhouseId);
+    throw new Error('Huawei IoT shadow unavailable');
   }
 
   static setDeviceStatus(greenhouseId: string, key: string, enabled: boolean): SensorData {
@@ -90,6 +113,7 @@ export class AppService {
       co2: data.co2,
       o2: data.o2,
       ph: data.ph,
+      distance: data.distance,
       fanGear: data.fanGear,
       lightOn: key === 'light' ? enabled : data.lightOn,
       boardOn: key === 'board' ? enabled : data.boardOn,
@@ -115,6 +139,7 @@ export class AppService {
       co2: data.co2,
       o2: data.o2,
       ph: data.ph,
+      distance: data.distance,
       fanGear: Math.max(0, Math.min(9, gear)),
       lightOn: data.lightOn,
       boardOn: data.boardOn,

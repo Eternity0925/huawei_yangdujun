@@ -1,6 +1,11 @@
 export class SecureEndpointConfig {
-  // 后端代理服务地址。DeepSeek、华为云、百度等 Key 只放在后端，不写入 HAP。
-  static readonly API_BASE_URL: string = 'http://192.168.43.65:8080';
+  // Backend proxy address. Keys for DeepSeek, Huawei Cloud, Baidu, etc. stay on the backend.
+  static readonly API_BASE_URL: string = 'http://172.20.10.3:8080';
+  static readonly API_BASE_URLS: string[] = [
+    SecureEndpointConfig.API_BASE_URL,
+    'http://127.0.0.1:8080',
+    'http://localhost:8080'
+  ];
 
   static readonly AI_CHAT_PATH: string = '/ai/chat';
   static readonly AI_SUGGESTION_PATH: string = '/ai/suggestion';
@@ -10,6 +15,6 @@ export class SecureEndpointConfig {
   static readonly BAIDU_MAP_TOKEN_PATH: string = '/map/baidu/token';
 
   static hasBackend(): boolean {
-    return SecureEndpointConfig.API_BASE_URL.trim().length > 0;
+    return SecureEndpointConfig.API_BASE_URLS.length > 0;
   }
 }

@@ -50,6 +50,14 @@ struct DeviceMonitorPage {
 
     this.operateIndex = 0;
     this.sensor = AppService.getSensorData(this.currentGreenhouse().id);
+    this.refreshSensorFromBackend();
+  }
+
+  private refreshSensorFromBackend(): void {
+    AppService.refreshSensorFromBackend(this.currentGreenhouse().id).then((data: SensorData) => {
+      this.sensor = data;
+    }).catch(() => {
+    });
   }
 
   private toBaseDeviceId(fullDeviceId: string, greenhouseId: string): string {
@@ -141,6 +149,7 @@ struct DeviceMonitorPage {
           if (type === 'greenhouse') {
             this.greenhouseIndex = index;
             this.sensor = AppService.getSensorData(this.currentGreenhouse().id);
+            this.refreshSensorFromBackend();
           } else if (type === 'device') {
             this.deviceIndex = index;
             this.operateIndex = 0;

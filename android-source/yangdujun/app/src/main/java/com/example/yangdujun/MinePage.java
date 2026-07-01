@@ -79,7 +79,6 @@ public class MinePage extends AppCompatActivity {
         View itemFeedback = findViewById(R.id.itemFeedback);
         View itemLogout = findViewById(R.id.itemLogout);
         View itemSettings = findViewById(R.id.itemSettings);
-        View itemWeather = findViewById(R.id.itemWeather);
         View deepseek = findViewById(R.id.Deepseek);
 
         // 初始化配置存储
@@ -126,15 +125,6 @@ public class MinePage extends AppCompatActivity {
             });
         } else if (itemSettings != null) {
             itemSettings.setVisibility(View.GONE);
-        }
-
-        // 智能天气
-        if (itemWeather != null) {
-            itemWeather.setVisibility(View.VISIBLE);
-            itemWeather.setOnClickListener(v -> {
-                Toast.makeText(MinePage.this, "点击了智能天气", Toast.LENGTH_SHORT).show();
-                startActivity(new Intent(MinePage.this, WeatherActivity.class));
-            });
         }
 
         // AI对话
@@ -268,7 +258,6 @@ public class MinePage extends AppCompatActivity {
         View itemGreenhouse = findViewById(R.id.itemGreenhouse);
         View itemFeedback = findViewById(R.id.itemFeedback);
         View itemSettings = findViewById(R.id.itemSettings);
-        View itemWeather = findViewById(R.id.itemWeather);
         View deepseek = findViewById(R.id.Deepseek);
 
         // 我的大棚
@@ -290,11 +279,6 @@ public class MinePage extends AppCompatActivity {
             itemSettings.setVisibility(View.VISIBLE);
         } else {
             itemSettings.setVisibility(View.GONE);
-        }
-
-        // 智能天气
-        if (itemWeather != null) {
-            itemWeather.setVisibility(View.VISIBLE);
         }
 
         // AI对话

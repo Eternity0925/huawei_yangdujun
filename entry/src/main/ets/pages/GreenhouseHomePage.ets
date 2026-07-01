@@ -1,4 +1,5 @@
 import { promptAction, router } from '@kit.ArkUI';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AndroidBottomNav, AndroidTopBar } from '../common/AndroidWidgets';
 import { AndroidColor } from '../common/AndroidStyle';
 import { AppRoutes } from '../common/AppRoutes';
@@ -23,11 +24,20 @@ interface StageItem {
 @Entry
 @Component
 struct GreenhouseHomePage {
+  private static readonly LOG_DOMAIN: number = 0x0001;
+  private static readonly LOG_TAG: string = 'GreenhouseCloud';
   @State selectedIndex: number = 0;
-  @State sensorData: SensorData = AppService.getSensorData('default');
+  @State sensorData: SensorData = AppService.emptyCloudSensorData();
+  @State cloudAirTemperature: number = -1;
+  @State cloudAirHumidity: number = -1;
+  @State cloudLight: number = -1;
+  @State cloudDistance: number = -1;
+  @State cloudFanGear: number = 0;
+  @State cloudLightOn: boolean = false;
   @State isLoadingAi: boolean = false;
   @State aiSuggestion: string = '';
   private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  private refreshTimer: number = -1;
   private stages: StageItem[] = [
     { name: '菌丝生长期', image: $r('app.media.deep_image_1') },
     { name: '催菇期', image: $r('app.media.deep_image_2') },
@@ -37,6 +47,18 @@ struct GreenhouseHomePage {
 
   aboutToAppear(): void {
     this.refreshSensor();
+    if (this.refreshTimer < 0) {
+      this.refreshTimer = setInterval(() => {
+        this.refreshSensor();
+      }, 5000);
+    }
+  }
+
+  aboutToDisappear(): void {
+    if (this.refreshTimer >= 0) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = -1;
+    }
   }
 
   private currentGreenhouse(): Greenhouse {
@@ -47,9 +69,20 @@ struct GreenhouseHomePage {
   }
 
   private refreshSensor(): void {
-    this.sensorData = AppService.getSensorData(this.currentGreenhouse().id);
     AppService.refreshSensorFromBackend(this.currentGreenhouse().id).then((data: SensorData) => {
+      hilog.info(GreenhouseHomePage.LOG_DOMAIN, GreenhouseHomePage.LOG_TAG,
+        'home assign Temp=%{public}f Humi=%{public}f Lumi=%{public}f SoilHumi=%{public}f CO2=%{public}f',
+        data.airTemperature, data.airHumidity, data.light, data.soilHumidity, data.co2);
       this.sensorData = data;
+      this.cloudAirTemperature = data.airTemperature;
+      this.cloudAirHumidity = data.airHumidity;
+      this.cloudLight = data.light;
+      this.cloudDistance = data.distance;
+      this.cloudFanGear = data.fanGear;
+      this.cloudLightOn = data.lightOn;
+    }).catch((err: Error) => {
+      hilog.error(GreenhouseHomePage.LOG_DOMAIN, GreenhouseHomePage.LOG_TAG,
+        'home refresh failed: %{public}s', JSON.stringify(err));
     });
   }
 
@@ -93,14 +126,18 @@ struct GreenhouseHomePage {
 
   private sensorItems(): SensorCardItem[] {
     return [
-      { title: '土壤温度(℃)', value: `${this.sensorData.soilTemperature}`, image: $r('app.media.jun_temp') },
-      { title: '空气温度(℃)', value: `${this.sensorData.airTemperature}`, image: $r('app.media.sun_temp') },
-      { title: '土壤湿度(RH%)', value: `${this.sensorData.soilHumidity}`, image: $r('app.media.jun_water') },
-      { title: '空气湿度(RH%)', value: `${this.sensorData.airHumidity}`, image: $r('app.media.o_water') },
-      { title: '光照强度(lux)', value: `${this.sensorData.light}`, image: $r('app.media.sun') },
-      { title: 'CO2(ppm)', value: `${this.sensorData.co2}`, image: $r('app.media.co2') },
-      { title: 'pH', value: `${this.sensorData.ph}`, image: $r('app.media.ph') }
+      { title: '空气温度(℃)', value: this.cloudValue(this.cloudAirTemperature), image: $r('app.media.sun_temp') },
+      { title: '空气湿度(RH%)', value: this.cloudValue(this.cloudAirHumidity), image: $r('app.media.o_water') },
+      { title: '光照强度(lux)', value: this.cloudValue(this.cloudLight), image: $r('app.media.sun') },
+      { title: '土壤温度(℃)', value: this.cloudValue(this.sensorData.soilTemperature), image: $r('app.media.jun_temp') },
+      { title: '土壤湿度(RH%)', value: this.cloudValue(this.sensorData.soilHumidity), image: $r('app.media.jun_water') },
+      { title: 'CO2(ppm)', value: this.cloudValue(this.sensorData.co2), image: $r('app.media.co2') },
+      { title: 'pH', value: this.cloudValue(this.sensorData.ph), image: $r('app.media.ph') }
     ];
+  }
+
+  private cloudValue(value: number): string {
+    return value < 0 ? '--' : `${value}`;
   }
 
   @Builder
@@ -262,16 +299,67 @@ struct GreenhouseHomePage {
           Column() {
             this.SectionTitle('实时环境数据')
             Grid() {
-              ForEach(this.sensorItems(), (item: SensorCardItem) => {
-                GridItem() {
-                  this.SensorCard(item)
-                }
-              }, (item: SensorCardItem) => item.title)
+              GridItem() {
+                this.SensorCard({
+                  title: '空气温度(℃)',
+                  value: this.cloudValue(this.cloudAirTemperature),
+                  image: $r('app.media.sun_temp')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: '空气湿度(RH%)',
+                  value: this.cloudValue(this.cloudAirHumidity),
+                  image: $r('app.media.o_water')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: '光照强度(lux)',
+                  value: this.cloudValue(this.cloudLight),
+                  image: $r('app.media.sun')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: '距离(cm)',
+                  value: this.cloudValue(this.cloudDistance),
+                  image: $r('app.media.jun_temp')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: '土壤温度(℃)',
+                  value: this.cloudValue(this.sensorData.soilTemperature),
+                  image: $r('app.media.jun_temp')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: '土壤湿度(RH%)',
+                  value: this.cloudValue(this.sensorData.soilHumidity),
+                  image: $r('app.media.jun_water')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: 'CO2(ppm)',
+                  value: this.cloudValue(this.sensorData.co2),
+                  image: $r('app.media.co2')
+                })
+              }
+              GridItem() {
+                this.SensorCard({
+                  title: 'pH',
+                  value: this.cloudValue(this.sensorData.ph),
+                  image: $r('app.media.ph')
+                })
+              }
             }
             .columnsTemplate('1fr 1fr')
             .columnsGap(10)
             .rowsGap(10)
-            .height(366)
+            .height(492)
           }
           .padding(10)
           .backgroundColor(AndroidColor.SECTION_BG)
@@ -334,14 +422,14 @@ struct GreenhouseHomePage {
             this.DeviceRow('挡光板状态', 'board', 'DangGuangBan', this.sensorData.boardOn)
             this.DeviceRow('药泵状态', 'medicine', 'BUMP', this.sensorData.medicinePumpOn)
             this.DeviceRow('水泵状态', 'water', 'BUMP', this.sensorData.waterPumpOn)
-            this.DeviceRow('灯泡状态', 'light', 'LightSt', this.sensorData.lightOn)
+            this.DeviceRow('灯泡状态', 'light', 'LightSt', this.cloudLightOn)
 
             Row() {
               Text('风扇档位')
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#141E17')
-              Text(`${this.sensorData.fanGear} 档`)
+              Text(`${this.cloudFanGear} 档`)
                 .layoutWeight(1)
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
