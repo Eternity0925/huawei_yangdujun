@@ -13,7 +13,10 @@ struct AiSuggestionPage {
   private async sendText(): Promise<void> {
     const text = this.inputText.trim();
     if (text.length === 0) {
-      promptAction.showToast({ message: '请输入提问内容' });
+      promptAction.showToast({ message: '\u8bf7\u8f93\u5165\u63d0\u95ee\u5185\u5bb9' });
+      return;
+    }
+    if (this.isLoading) {
       return;
     }
     this.isLoading = true;
@@ -28,34 +31,24 @@ struct AiSuggestionPage {
 
   build() {
     Column() {
-      AndroidBackTopBar({ title: 'AI 种植助手' })
+      AndroidBackTopBar({ title: 'AI \u79cd\u690d\u52a9\u624b' })
         .margin({ bottom: 12 })
 
       Scroll() {
         Column({ space: 12 }) {
-          Text('按住说话 / 文字提问')
+          Text('\u6587\u5b57\u63d0\u95ee')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor('#143D2A')
             .width('100%')
 
-          Text('语音识别需要后端代理华为云 SIS。当前页面已保留语音入口，文字提问会通过后端代理调用 DeepSeek。')
+          Text('\u53ef\u4ee5\u8be2\u95ee\u7f8a\u809a\u83cc\u5927\u68da\u73af\u5883\u8c03\u63a7\u3001\u544a\u8b66\u5904\u7406\u3001\u751f\u957f\u9636\u6bb5\u7ba1\u7406\u7b49\u95ee\u9898\uff0c\u56de\u7b54\u7531\u540e\u7aef\u4ee3\u7406\u8c03\u7528 DeepSeek \u751f\u6210\u3002')
             .fontSize(13)
             .fontColor('#667085')
             .lineHeight(20)
             .width('100%')
 
-          Button('按住说话')
-            .width('100%')
-            .height(48)
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-            .backgroundColor('#238B45')
-            .borderRadius(24)
-            .onClick(() => promptAction.showToast({ message: '语音识别接口已预留，请接入后端 /voice/asr' }))
-
-          TextInput({ placeholder: '请输入你的问题', text: this.inputText })
+          TextInput({ placeholder: '\u8bf7\u8f93\u5165\u4f60\u7684\u95ee\u9898', text: this.inputText })
             .width('100%')
             .height(48)
             .backgroundColor(Color.White)
@@ -64,7 +57,7 @@ struct AiSuggestionPage {
               this.inputText = value;
             })
 
-          Button(this.isLoading ? '发送中...' : '发送')
+          Button(this.isLoading ? '\u53d1\u9001\u4e2d...' : '\u53d1\u9001')
             .width('100%')
             .height(46)
             .fontSize(16)
@@ -72,11 +65,12 @@ struct AiSuggestionPage {
             .fontColor(Color.White)
             .backgroundColor('#238B45')
             .borderRadius(23)
+            .enabled(!this.isLoading)
             .onClick(() => this.sendText())
 
           if (this.latestAnswer.length > 0) {
             Column({ space: 8 }) {
-              Text('AI 回复')
+              Text('AI \u56de\u590d')
                 .fontSize(17)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#143D2A')
@@ -94,12 +88,12 @@ struct AiSuggestionPage {
           }
 
           Column({ space: 8 }) {
-            Text('历史记录')
+            Text('\u5386\u53f2\u8bb0\u5f55')
               .fontSize(17)
               .fontWeight(FontWeight.Bold)
               .fontColor('#143D2A')
               .width('100%')
-            Text(this.history.length > 0 ? this.history : '暂无历史记录')
+            Text(this.history.length > 0 ? this.history : '\u6682\u65e0\u5386\u53f2\u8bb0\u5f55')
               .fontSize(14)
               .fontColor('#1F2937')
               .lineHeight(22)

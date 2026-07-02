@@ -27,7 +27,7 @@ struct NewPasswordPage {
     return isAllLetter || isAllDigit;
   }
 
-  private submit(): void {
+  private async submit(): Promise<void> {
     if (this.phone.length !== 11) {
       promptAction.showToast({ message: '请输入正确的手机号码' });
       return;
@@ -41,7 +41,7 @@ struct NewPasswordPage {
       return;
     }
     promptAction.showToast({ message: '重置密码中...' });
-    const ok = AppService.resetPassword(this.phone, this.password);
+    const ok = await AppService.resetPassword(this.phone, this.password);
     if (!ok) {
       promptAction.showToast({ message: '重置密码失败，请稍后重试' });
       return;

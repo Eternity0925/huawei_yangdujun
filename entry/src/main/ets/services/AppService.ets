@@ -14,15 +14,20 @@ import { SecureIntegrationService } from './SecureIntegrationService';
 
 export class AppService {
   static async login(phone: string, password: string): Promise<boolean> {
-    return AppState.login(phone, password);
+    const user = await SecureIntegrationService.loginFarmer(phone, password);
+    if (!user) {
+      return false;
+    }
+    AppState.setCurrentUser(user);
+    return true;
   }
 
   static async register(phone: string, password: string): Promise<boolean> {
-    return AppState.register(phone, password);
+    return SecureIntegrationService.registerFarmer(phone, password);
   }
 
-  static resetPassword(phone: string, newPassword: string): boolean {
-    return AppState.resetPassword(phone, newPassword);
+  static async resetPassword(phone: string, newPassword: string): Promise<boolean> {
+    return SecureIntegrationService.resetFarmerPassword(phone, newPassword);
   }
 
   static logout(): void {
@@ -41,13 +46,22 @@ export class AppService {
     return AppState.greenhouses;
   }
 
+  static async refreshGreenhousesFromDatabase(): Promise<Greenhouse[]> {
+    const userId = AppState.currentUser ? AppState.currentUser.id : '';
+    const greenhouses = await SecureIntegrationService.fetchDatabaseGreenhouses(userId);
+    if (greenhouses.length > 0) {
+      AppState.greenhouses = greenhouses;
+    }
+    return AppState.greenhouses;
+  }
+
   static addGreenhouse(name: string, location: string, area: string): Greenhouse {
     const greenhouse: Greenhouse = {
       id: `greenhouse-${Date.now()}`,
       name,
       location,
       area,
-      stage: '出菇管理期'
+      stage: '\u51fa\u83c7\u7ba1\u7406\u671f'
     };
     AppState.greenhouses.push(greenhouse);
     AppState.updateSensorData(greenhouse.id, AppState.getSensorData('default'));
@@ -55,10 +69,29 @@ export class AppService {
     return greenhouse;
   }
 
+  static async addGreenhouseToDatabase(name: string, location: string, area: string): Promise<Greenhouse> {
+    const userId = AppState.currentUser ? AppState.currentUser.id : '';
+    const greenhouses = await SecureIntegrationService.createDatabaseGreenhouse(userId, name, location, area);
+    if (greenhouses.length > 0) {
+      AppState.greenhouses = greenhouses;
+      return AppState.greenhouses[AppState.greenhouses.length - 1];
+    }
+    throw new Error('greenhouse create failed');
+  }
+
   static removeGreenhouse(greenhouseId: string): void {
     AppState.greenhouses = AppState.greenhouses.filter((item: Greenhouse) => item.id !== greenhouseId);
     AppState.devices = AppState.devices.filter((item: Device) => item.greenhouseId !== greenhouseId);
     AppState.alarms = AppState.alarms.filter((item: AlarmRecord) => item.greenhouseId !== greenhouseId);
+  }
+
+  static async deleteGreenhouseFromDatabase(greenhouseId: string): Promise<boolean> {
+    const userId = AppState.currentUser ? AppState.currentUser.id : '';
+    const ok = await SecureIntegrationService.deleteDatabaseGreenhouse(userId, greenhouseId);
+    if (ok) {
+      AppService.removeGreenhouse(greenhouseId);
+    }
+    return ok;
   }
 
   static getSensorData(greenhouseId: string): SensorData {
@@ -93,13 +126,98 @@ export class AppService {
   }
 
   static async refreshSensorFromBackend(greenhouseId: string): Promise<SensorData> {
-    const shadow = await SecureIntegrationService.fetchHuaweiIoTShadow(greenhouseId);
-    if (shadow.success && shadow.sensor) {
-      AppState.updateSensorData(greenhouseId, shadow.sensor);
-      AppService.syncDevicesFromSensor(greenhouseId, shadow.sensor);
-      return AppState.getSensorData(greenhouseId);
+    const greenhouse = AppState.greenhouses.find((item: Greenhouse) => item.id === greenhouseId);
+    if (AppService.isHuaweiCloudGreenhouse(greenhouseId, greenhouse)) {
+      const cloudResponse = await SecureIntegrationService.fetchHuaweiIoTShadow(greenhouseId);
+      if (cloudResponse.success && cloudResponse.sensor) {
+        AppState.updateSensorData(greenhouseId, cloudResponse.sensor);
+        AppService.syncDevicesFromSensor(greenhouseId, cloudResponse.sensor);
+        return AppState.getSensorData(greenhouseId);
+      }
+      throw new Error('sensor data unavailable');
     }
-    throw new Error('Huawei IoT shadow unavailable');
+
+    const databaseResponse = await SecureIntegrationService.fetchDatabaseSensor(greenhouseId);
+    if (!databaseResponse.success || !databaseResponse.sensor) {
+      throw new Error('sensor data unavailable');
+    }
+    const devices = await SecureIntegrationService.fetchDatabaseDevices(greenhouseId);
+    if (devices.length > 0) {
+      AppState.devices = AppState.devices.filter((item: Device) => item.greenhouseId !== greenhouseId).concat(devices);
+    }
+    const databaseSensor = AppService.withDatabaseDeviceState(
+      AppService.withDatabaseStage(databaseResponse.sensor, greenhouse),
+      devices
+    );
+    AppState.updateSensorData(greenhouseId, databaseSensor);
+    return AppState.getSensorData(greenhouseId);
+  }
+
+  static async refreshDevicesFromDatabase(greenhouseId: string): Promise<Device[]> {
+    const greenhouse = AppState.greenhouses.find((item: Greenhouse) => item.id === greenhouseId);
+    if (AppService.isHuaweiCloudGreenhouse(greenhouseId, greenhouse)) {
+      await AppService.refreshSensorFromBackend(greenhouseId);
+      return AppService.getDevices(greenhouseId);
+    }
+
+    const devices = await SecureIntegrationService.fetchDatabaseDevices(greenhouseId);
+    if (devices.length > 0) {
+      AppState.devices = AppState.devices.filter((item: Device) => item.greenhouseId !== greenhouseId).concat(devices);
+      return devices;
+    }
+    return AppService.getDevices(greenhouseId);
+  }
+
+  static async refreshAlarmsFromDatabase(greenhouseId: string = ''): Promise<AlarmRecord[]> {
+    const alarms = await SecureIntegrationService.fetchDatabaseAlarms(greenhouseId);
+    if (alarms.length > 0 || greenhouseId.length === 0) {
+      if (greenhouseId.length === 0) {
+        AppState.alarms = alarms;
+      } else {
+        AppState.alarms = AppState.alarms.filter((item: AlarmRecord) => item.greenhouseId !== greenhouseId).concat(alarms);
+      }
+    }
+    return AppService.getAlarms(greenhouseId.length > 0 ? greenhouseId : undefined);
+  }
+
+  static async refreshThresholdFromDatabase(greenhouseId: string): Promise<ThresholdConfig> {
+    const threshold = await SecureIntegrationService.fetchDatabaseThreshold(greenhouseId);
+    if (threshold) {
+      AppState.updateThreshold(greenhouseId, threshold);
+      return threshold;
+    }
+    return AppState.getThreshold(greenhouseId);
+  }
+
+  static async refreshHistoryFromDatabase(greenhouseId: string, limit: number = 24): Promise<EnvironmentPoint[]> {
+    const items = await SecureIntegrationService.fetchDatabaseHistory(greenhouseId, limit);
+    AppState.history = AppState.history.filter((item: EnvironmentPoint) => item.greenhouseId !== greenhouseId).concat(items);
+    return items;
+  }
+
+  static async handleAlarmWithDatabase(alarmId: string): Promise<boolean> {
+    const user = AppState.currentUser;
+    const handlerName = user ? user.nickname : '未知用户';
+    const ok = await SecureIntegrationService.handleDatabaseAlarm(alarmId, handlerName);
+    if (ok) {
+      AppState.handleAlarm(alarmId, handlerName);
+      return true;
+    }
+    return false;
+  }
+
+  static async submitFeedback(content: string): Promise<boolean> {
+    const user = AppState.currentUser;
+    const trimmed = content.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+    const ok = await SecureIntegrationService.submitDatabaseFeedback(user ? user.id : '', trimmed, user ? user.phone : '');
+    if (ok) {
+      AppState.addFeedback(trimmed);
+      return true;
+    }
+    return false;
   }
 
   static setDeviceStatus(greenhouseId: string, key: string, enabled: boolean): SensorData {
@@ -179,8 +297,10 @@ export class AppService {
     return AppState.getThreshold(greenhouseId);
   }
 
-  static updateThreshold(greenhouseId: string, threshold: ThresholdConfig): void {
+  static async updateThreshold(greenhouseId: string, threshold: ThresholdConfig): Promise<boolean> {
+    const ok = await SecureIntegrationService.saveDatabaseThreshold(greenhouseId, threshold);
     AppState.updateThreshold(greenhouseId, threshold);
+    return ok;
   }
 
   static getHistory(greenhouseId: string, limit: number = 24): EnvironmentPoint[] {
@@ -193,10 +313,6 @@ export class AppService {
 
   static updateSetting(id: string, enabled: boolean): void {
     AppState.updateSetting(id, enabled);
-  }
-
-  static submitFeedback(content: string): boolean {
-    return AppState.addFeedback(content);
   }
 
   static buildAiPrompt(greenhouse: Greenhouse, data: SensorData): string {
@@ -250,15 +366,106 @@ pH：${data.ph}
   }
 
   static async sendDeviceCommand(greenhouseId: string, commandName: string, value: string | number | boolean): Promise<boolean> {
+    const greenhouse = AppState.greenhouses.find((item: Greenhouse) => item.id === greenhouseId);
+    if (!AppService.isHuaweiCloudGreenhouse(greenhouseId, greenhouse)) {
+      return false;
+    }
     return SecureIntegrationService.sendHuaweiIoTCommand({ greenhouseId, commandName, value });
   }
 
+  static canSendCloudCommand(greenhouseId: string): boolean {
+    const greenhouse = AppState.greenhouses.find((item: Greenhouse) => item.id === greenhouseId);
+    return AppService.isHuaweiCloudGreenhouse(greenhouseId, greenhouse);
+  }
+
   private static syncDevicesFromSensor(greenhouseId: string, data: SensorData): void {
-    AppService.upsertDevice(greenhouseId, 'light_1', '灯泡', 'light', data.lightOn ? 'ON' : 'OFF', data.lightOn);
-    AppService.upsertDevice(greenhouseId, 'board_1', '挡光板', 'board', data.boardOn ? 'ON' : 'OFF', data.boardOn);
-    AppService.upsertDevice(greenhouseId, 'fan_1', '风机', 'fan', `${data.fanGear}档`, data.fanGear > 0);
-    AppService.upsertDevice(greenhouseId, 'water_pump_1', '水泵', 'water', data.waterPumpOn ? 'ON' : 'OFF', data.waterPumpOn);
-    AppService.upsertDevice(greenhouseId, 'medicine_pump_1', '药泵', 'medicine', data.medicinePumpOn ? 'ON' : 'OFF', data.medicinePumpOn);
+    AppService.upsertDevice(greenhouseId, 'light_1', 'Light', 'light', data.lightOn ? 'ON' : 'OFF', data.lightOn);
+    AppService.upsertDevice(greenhouseId, 'board_1', 'Shade Board', 'board', data.boardOn ? 'ON' : 'OFF', data.boardOn);
+    AppService.upsertDevice(greenhouseId, 'fan_1', 'Fan', 'fan', data.fanGear > 0 ? data.fanGear + ' gear' : '--', data.fanGear > 0);
+    AppService.upsertDevice(greenhouseId, 'water_pump_1', 'Water Pump', 'water', data.waterPumpOn ? 'ON' : 'OFF', data.waterPumpOn);
+    AppService.upsertDevice(greenhouseId, 'medicine_pump_1', 'Medicine Pump', 'medicine', data.medicinePumpOn ? 'ON' : 'OFF', data.medicinePumpOn);
+  }
+
+  private static isHuaweiCloudGreenhouse(greenhouseId: string, greenhouse?: Greenhouse): boolean {
+    const id = greenhouseId.toLowerCase();
+    const name = greenhouse ? greenhouse.name : '';
+    const cloudId = id === '1' || id === 'farmer01' || id.indexOf('farmer01') >= 0;
+    const cloudName = name.indexOf('1\u53f7') >= 0 ||
+      name.indexOf('\u4e00\u53f7') >= 0 ||
+      name.indexOf('01') >= 0 ||
+      name.indexOf('A01') >= 0;
+    return cloudId || cloudName;
+  }
+
+  private static withDatabaseStage(sensor: SensorData, greenhouse?: Greenhouse): SensorData {
+    if (!greenhouse || sensor.growthStage > 0) {
+      return sensor;
+    }
+    return {
+      airTemperature: sensor.airTemperature,
+      airHumidity: sensor.airHumidity,
+      soilTemperature: sensor.soilTemperature,
+      soilHumidity: sensor.soilHumidity,
+      light: sensor.light,
+      co2: sensor.co2,
+      o2: sensor.o2,
+      ph: sensor.ph,
+      distance: sensor.distance,
+      fanGear: sensor.fanGear,
+      lightOn: sensor.lightOn,
+      boardOn: sensor.boardOn,
+      waterPumpOn: sensor.waterPumpOn,
+      medicinePumpOn: sensor.medicinePumpOn,
+      aiWarning: sensor.aiWarning,
+      growthStage: AppService.stageNumber(greenhouse.stage),
+      updatedAt: sensor.updatedAt
+    };
+  }
+
+  private static stageNumber(stage: string): number {
+    if (stage.indexOf('\u83cc\u4e1d') >= 0) {
+      return 1;
+    }
+    if (stage.indexOf('\u50ac\u83c7') >= 0) {
+      return 2;
+    }
+    if (stage.indexOf('\u539f\u57fa') >= 0) {
+      return 3;
+    }
+    if (stage.indexOf('\u51fa\u83c7') >= 0) {
+      return 4;
+    }
+    return 0;
+  }
+
+  private static withDatabaseDeviceState(sensor: SensorData, devices: Device[]): SensorData {
+    if (devices.length === 0) {
+      return sensor;
+    }
+    return {
+      airTemperature: sensor.airTemperature,
+      airHumidity: sensor.airHumidity,
+      soilTemperature: sensor.soilTemperature,
+      soilHumidity: sensor.soilHumidity,
+      light: sensor.light,
+      co2: sensor.co2,
+      o2: sensor.o2,
+      ph: sensor.ph,
+      distance: sensor.distance,
+      fanGear: AppService.databaseDeviceEnabled(devices, 'fan') ? 1 : -1,
+      lightOn: AppService.databaseDeviceEnabled(devices, 'light'),
+      boardOn: AppService.databaseDeviceEnabled(devices, 'board'),
+      waterPumpOn: AppService.databaseDeviceEnabled(devices, 'water'),
+      medicinePumpOn: AppService.databaseDeviceEnabled(devices, 'medicine'),
+      aiWarning: sensor.aiWarning,
+      growthStage: sensor.growthStage,
+      updatedAt: sensor.updatedAt
+    };
+  }
+
+  private static databaseDeviceEnabled(devices: Device[], type: string): boolean {
+    const device = devices.find((item: Device) => item.type === type);
+    return device ? device.enabled : false;
   }
 
   private static upsertDevice(greenhouseId: string, id: string, name: string, type: string, status: string, enabled: boolean): void {

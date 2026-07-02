@@ -11,6 +11,10 @@ struct AlarmRecordPage {
 
   aboutToAppear(): void {
     this.alarms = AppService.getAlarms();
+    AppService.refreshAlarmsFromDatabase().then((items: AlarmRecord[]) => {
+      this.alarms = items;
+    }).catch(() => {
+    });
   }
 
   private isHandled(item: AlarmRecord): boolean {

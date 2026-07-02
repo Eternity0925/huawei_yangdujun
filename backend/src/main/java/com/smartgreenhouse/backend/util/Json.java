@@ -38,7 +38,15 @@ public final class Json {
         for (int i = startQuote + 1; i < json.length(); i++) {
             char c = json.charAt(i);
             if (escaped) {
-                result.append(c);
+                if (c == 'n') {
+                    result.append('\n');
+                } else if (c == 'r') {
+                    result.append('\r');
+                } else if (c == 't') {
+                    result.append('\t');
+                } else {
+                    result.append(c);
+                }
                 escaped = false;
             } else if (c == '\\') {
                 escaped = true;

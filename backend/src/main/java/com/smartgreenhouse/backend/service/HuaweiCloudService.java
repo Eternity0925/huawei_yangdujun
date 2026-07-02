@@ -29,16 +29,8 @@ public class HuaweiCloudService {
             env("HUAWEI_IOT_DOMAIN", "why66665"),
             env("HUAWEI_IOT_PROJECT_NAME", "cn-north-4"));
 
-    private static final CloudAccount ASR_ACCOUNT = new CloudAccount(
-            env("HUAWEI_ASR_USERNAME", "ydj_19test"),
-            env("HUAWEI_ASR_PASSWORD", "yzq20060408"),
-            env("HUAWEI_ASR_DOMAIN", "qiyu66"),
-            env("HUAWEI_ASR_PROJECT_NAME", "cn-north-4"));
-
     private String iotToken = "";
     private long iotTokenExpireAtMs = 0L;
-    private String asrToken = "";
-    private long asrTokenExpireAtMs = 0L;
 
     public String latestShadow() {
         try {
@@ -63,10 +55,10 @@ public class HuaweiCloudService {
             String body = "{"
                     + "\"service_id\":\"" + Json.escape(IOT_SERVICE_ID) + "\","
                     + "\"command_name\":\"" + Json.escape(command.name) + "\","
-                    + "\"expire_time\":30,"
+                    + "\"expire_time\":0,"
                     + "\"paras\":{\"" + Json.escape(command.param) + "\":" + command.jsonValue + "}"
                     + "}";
-            HttpResult result = request("POST", url, body, token, "application/json;charset=UTF-8");
+            HttpResult result = request("POST", url, body, token, "application/json;charset=UTF-8", 5_000, 8_000, true);
             if (result.status >= 200 && result.status < 300) {
                 return "{\"success\":true}";
             }
@@ -74,16 +66,6 @@ public class HuaweiCloudService {
                     + Json.escape(result.body) + "\"}";
         } catch (IOException ex) {
             return "{\"success\":false,\"message\":\"" + Json.escape(ex.getMessage()) + "\"}";
-        }
-    }
-
-    public String recognizeSpeechBase64(String audioBase64) {
-        try {
-            // Keep a separate token cache so voice recognition continues using the old Android account.
-            asrToken();
-            return "{\"answer\":\"\"}";
-        } catch (IOException ex) {
-            return "{\"answer\":\"\"}";
         }
     }
 
@@ -96,17 +78,6 @@ public class HuaweiCloudService {
         iotToken = token.value;
         iotTokenExpireAtMs = token.expireAtMs;
         return iotToken;
-    }
-
-    private synchronized String asrToken() throws IOException {
-        long now = System.currentTimeMillis();
-        if (asrToken.length() > 0 && now < asrTokenExpireAtMs - 60_000L) {
-            return asrToken;
-        }
-        Token token = fetchToken(IOT_IAM_URL, ASR_ACCOUNT);
-        asrToken = token.value;
-        asrTokenExpireAtMs = token.expireAtMs;
-        return asrToken;
     }
 
     private Token fetchToken(String url, CloudAccount account) throws IOException {
@@ -139,11 +110,24 @@ public class HuaweiCloudService {
 
     private HttpResult request(String method, String urlText, String body, String token, String contentType)
             throws IOException {
+        return request(method, urlText, body, token, contentType, 12_000, 20_000);
+    }
+
+    private HttpResult request(String method, String urlText, String body, String token, String contentType,
+                               int connectTimeoutMs, int readTimeoutMs)
+            throws IOException {
+        return request(method, urlText, body, token, contentType, connectTimeoutMs, readTimeoutMs, false);
+    }
+
+    private HttpResult request(String method, String urlText, String body, String token, String contentType,
+                               int connectTimeoutMs, int readTimeoutMs, boolean skipSuccessBody)
+            throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(urlText).openConnection();
         connection.setRequestMethod(method);
-        connection.setConnectTimeout(12_000);
-        connection.setReadTimeout(20_000);
+        connection.setConnectTimeout(connectTimeoutMs);
+        connection.setReadTimeout(readTimeoutMs);
         connection.setRequestProperty("Content-Type", contentType);
+        connection.setRequestProperty("Connection", "close");
         if (token != null && token.length() > 0) {
             connection.setRequestProperty("X-Auth-Token", token);
         }
@@ -156,6 +140,9 @@ public class HuaweiCloudService {
             }
         }
         int status = connection.getResponseCode();
+        if (skipSuccessBody && status >= 200 && status < 300) {
+            return new HttpResult(status, "", connection.getHeaderField("X-Subject-Token"));
+        }
         String response = read(status >= 400 ? connection.getErrorStream() : connection.getInputStream());
         return new HttpResult(status, response, connection.getHeaderField("X-Subject-Token"));
     }
@@ -183,6 +170,7 @@ public class HuaweiCloudService {
                 + "\"co2\":" + firstNumber(body, -1, "CO2", "co2", "Co2") + ","
                 + "\"o2\":" + firstNumber(body, -1, "O2", "o2") + ","
                 + "\"ph\":" + firstNumber(body, -1, "pH", "PH", "ph") + ","
+                + "\"distance\":" + firstNumber(body, -1, "Dist", "distance", "Distance") + ","
                 + "\"fanGear\":" + integer(body, 0, "Fengd", "fengdegree", "fanGear") + ","
                 + "\"lightOn\":" + bool(body, "LightSt", "LampST", "light") + ","
                 + "\"boardOn\":" + bool(body, "board", "DangGuangBan", "windBoardStatus") + ","

@@ -6,8 +6,8 @@ import { AppService } from '../services/AppService';
 @Entry
 @Component
 struct LoginPage {
-  @State phone: string = '13800138000';
-  @State password: string = 'abc12345';
+  @State phone: string = 'farmer001';
+  @State password: string = '';
   @State agreed: boolean = true;
 
   private async submit(): Promise<void> {
@@ -18,7 +18,7 @@ struct LoginPage {
 
     const ok = await AppService.login(this.phone, this.password);
     if (!ok) {
-      promptAction.showToast({ message: '请输入手机号和密码' });
+      promptAction.showToast({ message: '农户账号或密码错误' });
       return;
     }
     router.replaceUrl({ url: AppRoutes.HOME });
@@ -40,7 +40,7 @@ struct LoginPage {
         .fontColor(AndroidColor.GREEN_LABEL)
         .placeholderColor(AndroidColor.GREEN_HINT)
         .backgroundColor(Color.Transparent)
-        .type(isPassword ? InputType.Password : InputType.PhoneNumber)
+        .type(isPassword ? InputType.Password : InputType.Normal)
         .onChange((value: string) => {
           if (isPassword) {
             this.password = value;
@@ -88,7 +88,7 @@ struct LoginPage {
             .shadow({ radius: 8, color: '#22000000', offsetX: 0, offsetY: 3 })
 
           Column() {
-            this.InputRow('+86', '请输入手机号', false)
+              this.InputRow('账号', '请输入农户账号', false)
 
             Column() {
               this.InputRow('密码', '请输入密码', true)

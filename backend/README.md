@@ -21,7 +21,7 @@ backend/lib/kingbase8.jar
 PowerShell:
 
 ```powershell
-$env:KINGBASE_URL="jdbc:kingbase8://192.168.43.36:54321/smart_greenhouse"
+$env:KINGBASE_URL="jdbc:kingbase8://101.42.99.139:54321/smart_greenhouse"
 $env:KINGBASE_USERNAME="system"
 $env:KINGBASE_PASSWORD="123456"
 ```
@@ -29,8 +29,7 @@ $env:KINGBASE_PASSWORD="123456"
 ## 3. Configure Huawei Cloud
 
 The HarmonyOS app calls this backend proxy. IoT data and commands use the `why`
-Huawei Cloud account by default, while voice ASR keeps a separate account that
-matches the original Android implementation.
+Huawei Cloud account by default.
 
 Optional overrides:
 
@@ -42,11 +41,6 @@ $env:HUAWEI_IOT_PROJECT_NAME="cn-north-4"
 $env:HUAWEI_IOT_PROJECT_ID="0e7c5e04a662439c813433f94d7ad4e7"
 $env:HUAWEI_IOT_DEVICE_ID="6a3a6da1cbb0cf6bb96829a4_WHYwhy"
 $env:HUAWEI_IOT_SERVICE_ID="王昊洋"
-
-$env:HUAWEI_ASR_USERNAME="ydj_19test"
-$env:HUAWEI_ASR_PASSWORD="yzq20060408"
-$env:HUAWEI_ASR_DOMAIN="qiyu66"
-$env:HUAWEI_ASR_PROJECT_NAME="cn-north-4"
 ```
 
 ## 4. Run

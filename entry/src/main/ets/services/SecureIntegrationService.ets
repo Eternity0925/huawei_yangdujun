@@ -1,7 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import util from '@ohos.util';
-import { Greenhouse, SensorData } from '../models/AppModels';
+import { AlarmRecord, Device, EnvironmentPoint, Greenhouse, SensorData, ThresholdConfig, User } from '../models/AppModels';
 import { SecureEndpointConfig } from './SecureEndpointConfig';
 
 export interface DeviceCommand {
@@ -38,23 +38,96 @@ interface SuccessResponse {
   success: boolean;
 }
 
-interface TokenResponse {
-  token: string;
+interface LoginResponse {
+  success: boolean;
+  user?: User;
+}
+
+interface SensorResponse {
+  success: boolean;
+  sensor?: SensorData;
+}
+
+interface GreenhouseListResponse {
+  success: boolean;
+  items?: Greenhouse[];
+}
+
+interface DeviceListResponse {
+  success: boolean;
+  items?: Device[];
+}
+
+interface AlarmListResponse {
+  success: boolean;
+  items?: AlarmRecord[];
+}
+
+interface ThresholdResponse {
+  success: boolean;
+  threshold?: ThresholdConfig;
+}
+
+interface HistoryResponse {
+  success: boolean;
+  items?: EnvironmentPoint[];
 }
 
 export class SecureIntegrationService {
   private static readonly LOG_DOMAIN: number = 0x0001;
   private static readonly LOG_TAG: string = 'GreenhouseCloud';
-  private static readonly HUAWEI_IAM_URL: string = 'https://iam.cn-north-4.myhuaweicloud.com/v3/auth/tokens';
-  private static readonly HUAWEI_IOT_ENDPOINT: string = 'https://b349431dee.st1.iotda-app.cn-north-4.myhuaweicloud.com:443';
-  private static readonly HUAWEI_IOT_PROJECT_ID: string = '0e7c5e04a662439c813433f94d7ad4e7';
-  private static readonly HUAWEI_IOT_DEVICE_ID: string = '6a3a6da1cbb0cf6bb96829a4_WHYwhy';
-  private static readonly HUAWEI_IOT_USERNAME: string = 'why';
-  private static readonly HUAWEI_IOT_PASSWORD: string = 'why123456';
-  private static readonly HUAWEI_IOT_DOMAIN: string = 'why66665';
-  private static readonly HUAWEI_IOT_PROJECT_NAME: string = 'cn-north-4';
-  private static huaweiIoTToken: string = '';
-  private static huaweiIoTTokenExpireAtMs: number = 0;
+  static async loginFarmer(account: string, password: string): Promise<User | null> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return null;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.AUTH_LOGIN_PATH,
+        JSON.stringify({ account, password })
+      );
+      const result = JSON.parse(raw) as LoginResponse;
+      if (result.success && result.user) {
+        return result.user;
+      }
+    } catch (err) {
+    }
+    return null;
+  }
+
+  static async registerFarmer(phone: string, password: string): Promise<boolean> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return false;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.AUTH_REGISTER_PATH,
+        JSON.stringify({ phone, password })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  static async resetFarmerPassword(phone: string, password: string): Promise<boolean> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return false;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.AUTH_RESET_PASSWORD_PATH,
+        JSON.stringify({ phone, password })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
+    }
+  }
 
   static async requestAiSuggestion(greenhouse: Greenhouse, sensor: SensorData, prompt: string): Promise<string> {
     if (!SecureEndpointConfig.hasBackend()) {
@@ -92,7 +165,7 @@ export class SecureIntegrationService {
 
   static async sendHuaweiIoTCommand(command: DeviceCommand): Promise<boolean> {
     if (!SecureEndpointConfig.hasBackend()) {
-      return true;
+      return false;
     }
 
     try {
@@ -105,37 +178,230 @@ export class SecureIntegrationService {
   }
 
   static async fetchHuaweiIoTShadow(greenhouseId: string): Promise<ShadowResponse> {
-    return SecureIntegrationService.fetchHuaweiIoTShadowDirect();
+    if (SecureEndpointConfig.hasBackend()) {
+      try {
+        const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.HUAWEI_IOT_SHADOW_PATH, JSON.stringify({ greenhouseId }));
+        const result = JSON.parse(raw) as ShadowResponse;
+        if (result.success && result.sensor) {
+          return result;
+        }
+      } catch (err) {
+      }
+    }
+    return { success: false };
   }
 
-  static async recognizeSpeechBase64(audioBase64: string): Promise<string> {
+  static async fetchDatabaseSensor(greenhouseId: string): Promise<ShadowResponse> {
     if (!SecureEndpointConfig.hasBackend()) {
-      return '语音识别后端未配置';
+      return { success: false };
+    }
+
+    try {
+      const path = `${SecureEndpointConfig.SENSOR_LATEST_PATH}?greenhouseId=${encodeURIComponent(greenhouseId)}`;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as SensorResponse;
+      if (result.success && result.sensor) {
+        return {
+          success: true,
+          sensor: SecureIntegrationService.normalizeSensor(result.sensor)
+        };
+      }
+    } catch (err) {
+    }
+    return { success: false };
+  }
+
+  static async fetchDatabaseGreenhouses(userId: string = ''): Promise<Greenhouse[]> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return [];
+    }
+
+    try {
+      const path = userId.length > 0 ?
+        `${SecureEndpointConfig.GREENHOUSES_PATH}?userId=${encodeURIComponent(userId)}` :
+        SecureEndpointConfig.GREENHOUSES_PATH;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as GreenhouseListResponse;
+      if (result.success && Array.isArray(result.items)) {
+        return result.items;
+      }
+    } catch (err) {
+    }
+    return [];
+  }
+
+  static async createDatabaseGreenhouse(userId: string, name: string, location: string, area: string): Promise<Greenhouse[]> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return [];
     }
 
     try {
       const raw = await SecureIntegrationService.postJson(
-        SecureEndpointConfig.HUAWEI_ASR_PATH,
-        JSON.stringify({ audioBase64 })
+        SecureEndpointConfig.GREENHOUSES_PATH,
+        JSON.stringify({ userId, name, location, area })
       );
-      const result = JSON.parse(raw) as AiTextResponse;
-      return result.answer || '';
+      const result = JSON.parse(raw) as GreenhouseListResponse;
+      if (result.success && Array.isArray(result.items)) {
+        return result.items;
+      }
     } catch (err) {
-      return '';
     }
+    return [];
   }
 
-  static async getBaiduMapToken(): Promise<string> {
+  static async deleteDatabaseGreenhouse(userId: string, greenhouseId: string): Promise<boolean> {
     if (!SecureEndpointConfig.hasBackend()) {
-      return '';
+      return false;
     }
 
     try {
-      const raw = await SecureIntegrationService.postJson(SecureEndpointConfig.BAIDU_MAP_TOKEN_PATH, '{}');
-      const result = JSON.parse(raw) as TokenResponse;
-      return result.token || '';
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.GREENHOUSE_DELETE_PATH,
+        JSON.stringify({ userId, greenhouseId })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
     } catch (err) {
-      return '';
+      return false;
+    }
+  }
+
+  static async fetchDatabaseDevices(greenhouseId: string): Promise<Device[]> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return [];
+    }
+
+    try {
+      const path = `${SecureEndpointConfig.DEVICES_PATH}?greenhouseId=${encodeURIComponent(greenhouseId)}`;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as DeviceListResponse;
+      if (result.success && Array.isArray(result.items)) {
+        return result.items;
+      }
+    } catch (err) {
+    }
+    return [];
+  }
+
+  static async fetchDatabaseAlarms(greenhouseId: string = ''): Promise<AlarmRecord[]> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return [];
+    }
+
+    try {
+      const path = greenhouseId.length > 0 ?
+        `${SecureEndpointConfig.ALARMS_PATH}?greenhouseId=${encodeURIComponent(greenhouseId)}` :
+        SecureEndpointConfig.ALARMS_PATH;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as AlarmListResponse;
+      if (result.success && Array.isArray(result.items)) {
+        return result.items;
+      }
+    } catch (err) {
+    }
+    return [];
+  }
+
+  static async handleDatabaseAlarm(alarmId: string, handlerName: string): Promise<boolean> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return false;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.ALARM_HANDLE_PATH,
+        JSON.stringify({ alarmId, handlerName })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  static async fetchDatabaseThreshold(greenhouseId: string): Promise<ThresholdConfig | null> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return null;
+    }
+
+    try {
+      const path = `${SecureEndpointConfig.THRESHOLD_PATH}?greenhouseId=${encodeURIComponent(greenhouseId)}`;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as ThresholdResponse;
+      if (result.success && result.threshold) {
+        return result.threshold;
+      }
+    } catch (err) {
+    }
+    return null;
+  }
+
+  static async saveDatabaseThreshold(greenhouseId: string, threshold: ThresholdConfig): Promise<boolean> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return false;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.THRESHOLD_PATH,
+        JSON.stringify({
+          greenhouseId,
+          tempMin: threshold.tempMin,
+          tempMax: threshold.tempMax,
+          airHumMin: threshold.airHumMin,
+          airHumMax: threshold.airHumMax,
+          soilTempMin: threshold.soilTempMin,
+          soilTempMax: threshold.soilTempMax,
+          humMin: threshold.humMin,
+          humMax: threshold.humMax,
+          co2Min: threshold.co2Min,
+          co2Max: threshold.co2Max,
+          o2Min: threshold.o2Min,
+          o2Max: threshold.o2Max,
+          phMin: threshold.phMin,
+          phMax: threshold.phMax,
+          lightMin: threshold.lightMin,
+          lightMax: threshold.lightMax
+        })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  static async fetchDatabaseHistory(greenhouseId: string, limit: number): Promise<EnvironmentPoint[]> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return [];
+    }
+
+    try {
+      const path = `${SecureEndpointConfig.SENSOR_HISTORY_PATH}?greenhouseId=${encodeURIComponent(greenhouseId)}&limit=${limit}`;
+      const raw = await SecureIntegrationService.getJson(path);
+      const result = JSON.parse(raw) as HistoryResponse;
+      if (result.success && Array.isArray(result.items)) {
+        return result.items;
+      }
+    } catch (err) {
+    }
+    return [];
+  }
+
+  static async submitDatabaseFeedback(userId: string, content: string, contact: string): Promise<boolean> {
+    if (!SecureEndpointConfig.hasBackend()) {
+      return false;
+    }
+
+    try {
+      const raw = await SecureIntegrationService.postJson(
+        SecureEndpointConfig.FEEDBACK_PATH,
+        JSON.stringify({ userId, content, contact })
+      );
+      const result = JSON.parse(raw) as SuccessResponse;
+      return result.success === true;
+    } catch (err) {
+      return false;
     }
   }
 
@@ -178,291 +444,61 @@ export class SecureIntegrationService {
     return '{}';
   }
 
-  private static async fetchHuaweiIoTShadowDirect(): Promise<ShadowResponse> {
-    try {
-      const token = await SecureIntegrationService.getHuaweiIoTTokenDirect();
-      const url = `${SecureIntegrationService.HUAWEI_IOT_ENDPOINT}/v5/iot/${SecureIntegrationService.HUAWEI_IOT_PROJECT_ID}/devices/${SecureIntegrationService.HUAWEI_IOT_DEVICE_ID}/shadow`;
-      const raw = await SecureIntegrationService.requestText(url, http.RequestMethod.GET, '', token);
-      hilog.info(SecureIntegrationService.LOG_DOMAIN, SecureIntegrationService.LOG_TAG,
-        'shadow raw len=%{public}d body=%{public}s', raw.length, SecureIntegrationService.preview(raw));
-      const sensor = SecureIntegrationService.sensorFromHuaweiShadow(raw);
-      hilog.info(SecureIntegrationService.LOG_DOMAIN, SecureIntegrationService.LOG_TAG,
-        'parsed Temp=%{public}f Humi=%{public}f Lumi=%{public}f SoilHumi=%{public}f CO2=%{public}f',
-        sensor.airTemperature, sensor.airHumidity, sensor.light, sensor.soilHumidity, sensor.co2);
-      return {
-        success: true,
-        sensor
-      };
-    } catch (err) {
-      hilog.error(SecureIntegrationService.LOG_DOMAIN, SecureIntegrationService.LOG_TAG,
-        'direct shadow failed: %{public}s', JSON.stringify(err));
-      return { success: false };
-    }
-  }
-
-  private static async getHuaweiIoTTokenDirect(): Promise<string> {
-    const now = Date.now();
-    if (SecureIntegrationService.huaweiIoTToken.length > 0 &&
-      now < SecureIntegrationService.huaweiIoTTokenExpireAtMs - 60000) {
-      return SecureIntegrationService.huaweiIoTToken;
-    }
-
-    const body = SecureIntegrationService.huaweiAuthBody();
-    const request = http.createHttp();
-    try {
-      const response = await request.request(SecureIntegrationService.HUAWEI_IAM_URL, {
-        method: http.RequestMethod.POST,
-        header: {
-          'Content-Type': 'application/json; charset=utf-8'
-        },
-        extraData: body,
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 15000,
-        readTimeout: 30000
-      });
-      if (Number(response.responseCode) < 200 || Number(response.responseCode) >= 300) {
-        throw new Error('Huawei IAM unavailable');
+  private static async getJson(path: string): Promise<string> {
+    for (let i = 0; i < SecureEndpointConfig.API_BASE_URLS.length; i++) {
+      const baseUrl = SecureEndpointConfig.API_BASE_URLS[i];
+      if (!baseUrl || baseUrl.trim().length === 0) {
+        continue;
       }
-      const token = SecureIntegrationService.headerValue(response.header, 'X-Subject-Token');
-      hilog.info(SecureIntegrationService.LOG_DOMAIN, SecureIntegrationService.LOG_TAG,
-        'IAM response=%{public}d tokenLen=%{public}d header=%{public}s',
-        Number(response.responseCode), token.length, SecureIntegrationService.preview(JSON.stringify(response.header)));
-      if (token.length === 0) {
-        throw new Error('Huawei IAM token missing');
-      }
-      SecureIntegrationService.huaweiIoTToken = token;
-      SecureIntegrationService.huaweiIoTTokenExpireAtMs = now + 60 * 60 * 1000;
-      return token;
-    } finally {
-      request.destroy();
-    }
-  }
+      const request = http.createHttp();
+      try {
+        const response = await request.request(`${baseUrl}${path}`, {
+          method: http.RequestMethod.GET,
+          header: {
+            'Content-Type': 'application/json'
+          },
+          expectDataType: http.HttpDataType.STRING,
+          connectTimeout: 5000,
+          readTimeout: 30000
+        });
 
-  private static huaweiAuthBody(): string {
-    return '{'
-      + '"auth":{'
-      + '"identity":{'
-      + '"methods":["password"],'
-      + '"password":{"user":{'
-      + '"name":"' + SecureIntegrationService.HUAWEI_IOT_USERNAME + '",'
-      + '"password":"' + SecureIntegrationService.HUAWEI_IOT_PASSWORD + '",'
-      + '"domain":{"name":"' + SecureIntegrationService.HUAWEI_IOT_DOMAIN + '"}'
-      + '}}'
-      + '},'
-      + '"scope":{"project":{"name":"' + SecureIntegrationService.HUAWEI_IOT_PROJECT_NAME + '"}}'
-      + '}'
-      + '}';
-  }
-
-  private static async requestText(url: string, method: http.RequestMethod, body: string, token: string): Promise<string> {
-    const request = http.createHttp();
-    try {
-      const options: http.HttpRequestOptions = {
-        method,
-        header: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': token
-        },
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 15000,
-        readTimeout: 30000
-      };
-      if (body.length > 0) {
-        options.extraData = body;
-      }
-      const response = await request.request(url, options);
-      if (Number(response.responseCode) < 200 || Number(response.responseCode) >= 300) {
-        throw new Error('Huawei IoT unavailable');
-      }
-      const text = SecureIntegrationService.responseText(response.result);
-      hilog.info(SecureIntegrationService.LOG_DOMAIN, SecureIntegrationService.LOG_TAG,
-        'requestText response=%{public}d resultType=%{public}s textLen=%{public}d',
-        Number(response.responseCode), SecureIntegrationService.resultTypeName(response.result), text.length);
-      return text;
-    } finally {
-      request.destroy();
-    }
-  }
-
-  private static sensorFromHuaweiShadow(raw: string): SensorData {
-    try {
-      const parsed = JSON.parse(raw) as Record<string, Object>;
-      const shadowList = parsed['shadow'] as Array<Record<string, Object>>;
-      if (Array.isArray(shadowList) && shadowList.length > 0) {
-        const reported = shadowList[0]['reported'] as Record<string, Object>;
-        const properties = reported['properties'] as Record<string, Object>;
-        if (properties) {
-          const eventTime = reported['event_time'] as string || '';
-          return SecureIntegrationService.sensorFromProperties(properties, eventTime);
+        if (typeof response.result === 'string') {
+          return response.result;
         }
+        return JSON.stringify(response.result);
+      } catch (err) {
+      } finally {
+        request.destroy();
       }
-    } catch (err) {
     }
+    return '{}';
+  }
 
+  private static normalizeSensor(sensor: SensorData): SensorData {
     return {
-      airTemperature: SecureIntegrationService.firstNumber(raw, -1, ['Temp', 'temperature', 'airTemperature']),
-      airHumidity: SecureIntegrationService.firstNumber(raw, -1, ['Humi', 'humidity', 'airHumidity']),
-      soilTemperature: SecureIntegrationService.firstNumber(raw, -1, ['Soil_Temp', 'SoilTemp', 'soilTemperature']),
-      soilHumidity: SecureIntegrationService.firstNumber(raw, -1, ['Soil_Humi', 'SoilHumi', 'soilHumidity']),
-      light: SecureIntegrationService.firstNumber(raw, -1, ['Lumi', 'light', 'lightIntensity']),
-      co2: SecureIntegrationService.firstNumber(raw, -1, ['CO2', 'co2', 'Co2']),
-      o2: SecureIntegrationService.firstNumber(raw, -1, ['O2', 'o2']),
-      ph: SecureIntegrationService.firstNumber(raw, -1, ['pH', 'PH', 'ph']),
-      distance: SecureIntegrationService.firstNumber(raw, -1, ['Dist', 'distance', 'Distance']),
-      fanGear: SecureIntegrationService.firstInteger(raw, 0, ['Fengd', 'fengdegree', 'fanGear']),
-      lightOn: SecureIntegrationService.firstBool(raw, ['LightSt', 'LampST', 'light']),
-      boardOn: SecureIntegrationService.firstBool(raw, ['DangGuangBan', 'board', 'windBoardStatus']),
-      waterPumpOn: SecureIntegrationService.firstBool(raw, ['Bump', 'BUMP', 'bump', 'pump']),
-      medicinePumpOn: SecureIntegrationService.firstBool(raw, ['MedicinePump', 'MedicineBump', 'DrugPump', 'YaoPump', 'YaoBump']),
-      aiWarning: SecureIntegrationService.firstText(raw, '', ['AIWarning', 'aiWarning']),
-      growthStage: SecureIntegrationService.firstInteger(raw, 0, ['GrowthStage', 'State', 'growthStage']),
-      updatedAt: SecureIntegrationService.firstText(raw, '', ['event_time', 'last_update_time'])
+      airTemperature: SecureIntegrationService.numberOr(sensor.airTemperature, -1),
+      airHumidity: SecureIntegrationService.numberOr(sensor.airHumidity, -1),
+      soilTemperature: SecureIntegrationService.numberOr(sensor.soilTemperature, -1),
+      soilHumidity: SecureIntegrationService.numberOr(sensor.soilHumidity, -1),
+      light: SecureIntegrationService.numberOr(sensor.light, -1),
+      co2: SecureIntegrationService.numberOr(sensor.co2, -1),
+      o2: SecureIntegrationService.numberOr(sensor.o2, -1),
+      ph: SecureIntegrationService.numberOr(sensor.ph, -1),
+      distance: SecureIntegrationService.numberOr(sensor.distance, -1),
+      fanGear: Math.trunc(SecureIntegrationService.numberOr(sensor.fanGear, 0)),
+      lightOn: sensor.lightOn === true,
+      boardOn: sensor.boardOn === true,
+      waterPumpOn: sensor.waterPumpOn === true,
+      medicinePumpOn: sensor.medicinePumpOn === true,
+      aiWarning: sensor.aiWarning || '',
+      growthStage: Math.trunc(SecureIntegrationService.numberOr(sensor.growthStage, 0)),
+      updatedAt: sensor.updatedAt || ''
     };
   }
 
-  private static sensorFromProperties(properties: Record<string, Object>, eventTime: string): SensorData {
-    return {
-      airTemperature: SecureIntegrationService.propertyNumber(properties, -1, ['Temp', 'temperature', 'airTemperature']),
-      airHumidity: SecureIntegrationService.propertyNumber(properties, -1, ['Humi', 'humidity', 'airHumidity']),
-      soilTemperature: SecureIntegrationService.propertyNumber(properties, -1, ['Soil_Temp', 'SoilTemp', 'soilTemperature']),
-      soilHumidity: SecureIntegrationService.propertyNumber(properties, -1, ['Soil_Humi', 'SoilHumi', 'soilHumidity']),
-      light: SecureIntegrationService.propertyNumber(properties, -1, ['Lumi', 'light', 'lightIntensity']),
-      co2: SecureIntegrationService.propertyNumber(properties, -1, ['CO2', 'co2', 'Co2']),
-      o2: SecureIntegrationService.propertyNumber(properties, -1, ['O2', 'o2']),
-      ph: SecureIntegrationService.propertyNumber(properties, -1, ['pH', 'PH', 'ph']),
-      distance: SecureIntegrationService.propertyNumber(properties, -1, ['Dist', 'distance', 'Distance']),
-      fanGear: Math.trunc(SecureIntegrationService.propertyNumber(properties, 0, ['Fengd', 'fengdegree', 'fanGear'])),
-      lightOn: SecureIntegrationService.propertyBool(properties, ['LightSt', 'LampST', 'light']),
-      boardOn: SecureIntegrationService.propertyBool(properties, ['DangGuangBan', 'board', 'windBoardStatus']),
-      waterPumpOn: SecureIntegrationService.propertyBool(properties, ['Bump', 'BUMP', 'bump', 'pump']),
-      medicinePumpOn: SecureIntegrationService.propertyBool(properties, ['MedicinePump', 'MedicineBump', 'DrugPump', 'YaoPump', 'YaoBump']),
-      aiWarning: SecureIntegrationService.propertyText(properties, '', ['AIWarning', 'aiWarning']),
-      growthStage: Math.trunc(SecureIntegrationService.propertyNumber(properties, 0, ['GrowthStage', 'State', 'growthStage'])),
-      updatedAt: eventTime
-    };
-  }
-
-  private static propertyNumber(properties: Record<string, Object>, fallback: number, keys: string[]): number {
-    const text = SecureIntegrationService.propertyText(properties, '', keys);
-    if (text.length === 0) {
-      return fallback;
-    }
-    const parsed = Number(SecureIntegrationService.extractNumber(text));
+  private static numberOr(value: number, fallback: number): number {
+    const parsed = Number(value);
     return parsed === parsed ? parsed : fallback;
-  }
-
-  private static propertyBool(properties: Record<string, Object>, keys: string[]): boolean {
-    const value = SecureIntegrationService.propertyText(properties, '', keys);
-    return value === '1' ||
-      value === 'true' ||
-      value === 'ON' ||
-      value === 'on' ||
-      value === '寮€';
-  }
-
-  private static propertyText(properties: Record<string, Object>, fallback: string, keys: string[]): string {
-    for (let i = 0; i < keys.length; i++) {
-      const value = properties[keys[i]];
-      if (value !== undefined && value !== null) {
-        return SecureIntegrationService.cleanCloudText(`${value}`);
-      }
-    }
-    return fallback;
-  }
-
-  private static firstNumber(raw: string, fallback: number, keys: string[]): number {
-    for (let i = 0; i < keys.length; i++) {
-      const value = SecureIntegrationService.extract(raw, keys[i]);
-      if (value.length > 0) {
-        const parsed = Number(SecureIntegrationService.extractNumber(value));
-        if (parsed === parsed) {
-          return parsed;
-        }
-      }
-    }
-    return fallback;
-  }
-
-  private static firstInteger(raw: string, fallback: number, keys: string[]): number {
-    return Math.trunc(SecureIntegrationService.firstNumber(raw, fallback, keys));
-  }
-
-  private static firstBool(raw: string, keys: string[]): boolean {
-    const value = SecureIntegrationService.firstText(raw, '', keys);
-    return value === '1' ||
-      value === 'true' ||
-      value === 'ON' ||
-      value === 'on' ||
-      value === '开';
-  }
-
-  private static firstText(raw: string, fallback: string, keys: string[]): string {
-    for (let i = 0; i < keys.length; i++) {
-      const value = SecureIntegrationService.extract(raw, keys[i]);
-      if (value.length > 0) {
-        return SecureIntegrationService.cleanCloudText(value);
-      }
-    }
-    return fallback;
-  }
-
-  private static extractNumber(rawValue: string): string {
-    const cleaned = SecureIntegrationService.cleanCloudText(rawValue);
-    let result = '';
-    for (let i = 0; i < cleaned.length; i++) {
-      const ch = cleaned.charAt(i);
-      if ((ch >= '0' && ch <= '9') || ch === '.' || ch === '-') {
-        result += ch;
-      }
-    }
-    return result.length > 0 ? result : '0';
-  }
-
-  private static cleanCloudText(value: string): string {
-    let cleaned = value.trim();
-    cleaned = cleaned.replace(/\\/g, '');
-    while (cleaned.startsWith('"') && cleaned.length > 1) {
-      cleaned = cleaned.substring(1);
-    }
-    while (cleaned.endsWith('"') && cleaned.length > 1) {
-      cleaned = cleaned.substring(0, cleaned.length - 1);
-    }
-    return cleaned.trim();
-  }
-
-  private static extract(raw: string, key: string): string {
-    const pattern = new RegExp(`"${key}"\\s*:\\s*("((?:\\\\.|[^"])*)"|-?\\d+(?:\\.\\d+)?|true|false|null)`);
-    const match = pattern.exec(raw || '');
-    if (!match) {
-      return '';
-    }
-    if (match[2] !== undefined) {
-      return match[2];
-    }
-    if (match[1] === 'null') {
-      return '';
-    }
-    return match[1] || '';
-  }
-
-  private static headerValue(header: Object, name: string): string {
-    const map = header as Record<string, Object>;
-    const lowerName = name.toLowerCase();
-    const keys = Object.keys(map);
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      if (key.toLowerCase() === lowerName) {
-        const value = map[key];
-        if (typeof value === 'string') {
-          return value;
-        }
-        if (Array.isArray(value) && value.length > 0) {
-          return `${value[0]}`;
-        }
-        return `${value}`;
-      }
-    }
-    return '';
   }
 
   private static responseText(result: string | Object | ArrayBuffer): string {

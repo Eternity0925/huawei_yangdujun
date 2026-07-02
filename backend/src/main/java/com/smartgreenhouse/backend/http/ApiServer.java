@@ -2,6 +2,8 @@ package com.smartgreenhouse.backend.http;
 
 import com.smartgreenhouse.backend.service.GreenhouseService;
 import com.smartgreenhouse.backend.service.HuaweiCloudService;
+import com.smartgreenhouse.backend.service.AuthService;
+import com.smartgreenhouse.backend.service.DeepSeekService;
 import com.smartgreenhouse.backend.util.Json;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -17,6 +19,8 @@ public class ApiServer {
     private final HttpServer server;
     private final GreenhouseService greenhouseService = new GreenhouseService();
     private final HuaweiCloudService huaweiCloudService = new HuaweiCloudService();
+    private final AuthService authService = new AuthService();
+    private final DeepSeekService deepSeekService = new DeepSeekService();
 
     public ApiServer(int port) throws IOException {
         server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
@@ -54,7 +58,125 @@ public class ApiServer {
             if (handleCors(exchange)) {
                 return;
             }
-            send(exchange, 200, greenhouseService.listGreenhouses());
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                String body = read(exchange);
+                String userId = Json.extractString(body, "userId", "");
+                String name = Json.extractString(body, "name", "");
+                String location = Json.extractString(body, "location", "");
+                String area = Json.extractString(body, "area", "");
+                send(exchange, 200, greenhouseService.createGreenhouse(userId, name, location, area));
+                return;
+            }
+            String userId = queryParam(exchange, "userId");
+            send(exchange, 200, greenhouseService.listGreenhouses(userId));
+        });
+
+        server.createContext("/greenhouse/delete", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String userId = Json.extractString(body, "userId", "");
+            String greenhouseId = Json.extractString(body, "greenhouseId", "");
+            send(exchange, 200, greenhouseService.deleteGreenhouse(userId, greenhouseId));
+        });
+
+        server.createContext("/auth/login", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String account = Json.extractString(body, "account", "");
+            String password = Json.extractString(body, "password", "");
+            send(exchange, 200, authService.loginFarmer(account, password));
+        });
+
+        server.createContext("/auth/register", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String phone = Json.extractString(body, "phone", "");
+            String password = Json.extractString(body, "password", "");
+            send(exchange, 200, authService.registerFarmer(phone, password));
+        });
+
+        server.createContext("/auth/reset-password", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String phone = Json.extractString(body, "phone", "");
+            String password = Json.extractString(body, "password", "");
+            send(exchange, 200, authService.resetFarmerPassword(phone, password));
+        });
+
+        server.createContext("/sensor/latest", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String greenhouseId = queryParam(exchange, "greenhouseId");
+            send(exchange, 200, greenhouseService.latestSensor(greenhouseId));
+        });
+
+        server.createContext("/sensor/history", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String greenhouseId = queryParam(exchange, "greenhouseId");
+            int limit = intParam(exchange, "limit", 24);
+            send(exchange, 200, greenhouseService.sensorHistory(greenhouseId, limit));
+        });
+
+        server.createContext("/devices", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String greenhouseId = queryParam(exchange, "greenhouseId");
+            send(exchange, 200, greenhouseService.listDevices(greenhouseId));
+        });
+
+        server.createContext("/alarms", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String greenhouseId = queryParam(exchange, "greenhouseId");
+            send(exchange, 200, greenhouseService.listAlarms(greenhouseId));
+        });
+
+        server.createContext("/alarm/handle", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String alarmId = Json.extractString(body, "alarmId", "");
+            String handlerName = Json.extractString(body, "handlerName", "");
+            send(exchange, 200, greenhouseService.handleAlarm(alarmId, handlerName));
+        });
+
+        server.createContext("/threshold", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                String body = read(exchange);
+                String greenhouseId = Json.extractString(body, "greenhouseId", "");
+                send(exchange, 200, greenhouseService.saveThreshold(greenhouseId, body));
+                return;
+            }
+            String greenhouseId = queryParam(exchange, "greenhouseId");
+            send(exchange, 200, greenhouseService.threshold(greenhouseId));
+        });
+
+        server.createContext("/feedback", exchange -> {
+            if (handleCors(exchange)) {
+                return;
+            }
+            String body = read(exchange);
+            String userId = Json.extractString(body, "userId", "");
+            String content = Json.extractString(body, "content", "");
+            String contact = Json.extractString(body, "contact", "");
+            send(exchange, 200, greenhouseService.submitFeedback(userId, content, contact));
         });
 
         server.createContext("/iot/shadow", exchange -> {
@@ -79,31 +201,21 @@ public class ApiServer {
             if (handleCors(exchange)) {
                 return;
             }
-            send(exchange, 200, "{\"answer\":\"后端已连接。AI 服务接口暂未配置。\"}");
+            String body = read(exchange);
+            String text = Json.extractString(body, "text", "");
+            String history = Json.extractString(body, "history", "");
+            send(exchange, 200, deepSeekService.chat(text, history));
         });
 
         server.createContext("/ai/suggestion", exchange -> {
             if (handleCors(exchange)) {
                 return;
             }
-            send(exchange, 200, "{\"suggestion\":\"风险等级：低\\n核心问题：后端已连接数据库，可继续接入真实 AI 分析。\\n紧急操作：保持温湿度稳定。\\n详细建议：请根据实时传感器数据调整设备。\"}");
-        });
-
-        server.createContext("/voice/asr", exchange -> {
-            if (handleCors(exchange)) {
-                return;
-            }
             String body = read(exchange);
-            String audioBase64 = Json.extractString(body, "audioBase64", "");
-            send(exchange, 200, huaweiCloudService.recognizeSpeechBase64(audioBase64));
+            String prompt = Json.extractString(body, "prompt", "");
+            send(exchange, 200, deepSeekService.suggestion(prompt));
         });
 
-        server.createContext("/map/baidu/token", exchange -> {
-            if (handleCors(exchange)) {
-                return;
-            }
-            send(exchange, 200, "{\"token\":\"\"}");
-        });
     }
 
     private boolean handleCors(HttpExchange exchange) throws IOException {
@@ -127,6 +239,34 @@ public class ApiServer {
             output.write(buffer, 0, read);
         }
         return new String(output.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private String queryParam(HttpExchange exchange, String name) {
+        String query = exchange.getRequestURI().getRawQuery();
+        if (query == null || query.isEmpty()) {
+            return "";
+        }
+        String prefix = name + "=";
+        String[] parts = query.split("&");
+        for (String part : parts) {
+            if (part.startsWith(prefix)) {
+                try {
+                    return java.net.URLDecoder.decode(part.substring(prefix.length()), "UTF-8");
+                } catch (java.io.UnsupportedEncodingException ex) {
+                    return part.substring(prefix.length());
+                }
+            }
+        }
+        return "";
+    }
+
+    private int intParam(HttpExchange exchange, String name, int fallback) {
+        try {
+            String value = queryParam(exchange, name);
+            return value.isEmpty() ? fallback : Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     private void send(HttpExchange exchange, int status, String body) throws IOException {

@@ -14,7 +14,7 @@ struct DeviceMonitorPage {
   @State deviceIndex: number = 0;
   @State operateIndex: number = 0;
   @State sensor: SensorData = AppService.getSensorData('default');
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
   private deviceNames: string[] = ['灯', '遮光板', '风扇', '水泵', '药泵'];
   private deviceIds: string[] = ['light_1', 'board_1', 'fan_1', 'water_pump_1', 'medicine_pump_1'];
 
@@ -23,6 +23,11 @@ struct DeviceMonitorPage {
     const greenhouseId = params && params.greenhouseId ? params.greenhouseId : '';
     const fullDeviceId = params && params.deviceId ? params.deviceId : '';
     this.applyRouteSelection(greenhouseId, fullDeviceId);
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      this.greenhouses = items;
+      this.applyRouteSelection(greenhouseId, fullDeviceId);
+    }).catch(() => {
+    });
   }
 
   private currentGreenhouse(): Greenhouse {
@@ -62,10 +67,16 @@ struct DeviceMonitorPage {
 
   private toBaseDeviceId(fullDeviceId: string, greenhouseId: string): string {
     const prefix = `${greenhouseId}-`;
+    let raw = fullDeviceId;
     if (fullDeviceId.indexOf(prefix) === 0) {
-      return fullDeviceId.substring(prefix.length);
+      raw = fullDeviceId.substring(prefix.length);
     }
-    return fullDeviceId;
+    for (let i = 0; i < this.deviceIds.length; i++) {
+      if (raw.indexOf(this.deviceIds[i]) === 0) {
+        return this.deviceIds[i];
+      }
+    }
+    return raw;
   }
 
   private greenhouseNames(): string[] {
@@ -101,7 +112,7 @@ struct DeviceMonitorPage {
 药泵：${this.sensor.medicinePumpOn ? '开' : '关'}`;
   }
 
-  private execute(): void {
+  private async execute(): Promise<void> {
     const greenhouseId = this.currentGreenhouse().id;
     const deviceId = this.deviceIds[this.deviceIndex];
     const operate = this.operateOptions()[this.operateIndex];
@@ -110,27 +121,45 @@ struct DeviceMonitorPage {
       return;
     }
 
+    if (deviceId === 'medicine_pump_1') {
+      promptAction.showToast({ message: '药泵暂不支持控制，仅显示状态' });
+      return;
+    }
+
+    if (!AppService.canSendCloudCommand(greenhouseId)) {
+      promptAction.showToast({ message: '只有一号大棚支持云端命令下发' });
+      this.refreshSensorFromBackend();
+      return;
+    }
+
+    let success = false;
     if (deviceId === 'fan_1') {
       const gear = this.operateIndex;
-      this.sensor = AppService.setFanGear(greenhouseId, gear);
-      AppService.sendDeviceCommand(greenhouseId, 'Fengdegree', gear);
+      success = await AppService.sendDeviceCommand(greenhouseId, 'Fengdegree', gear);
+      if (success) {
+        this.sensor = AppService.setFanGear(greenhouseId, gear);
+      }
     } else {
       const enabled = operate === '开启';
       if (deviceId === 'light_1') {
-        this.sensor = AppService.setDeviceStatus(greenhouseId, 'light', enabled);
-        AppService.sendDeviceCommand(greenhouseId, 'Light', enabled ? 'ON' : 'OFF');
+        success = await AppService.sendDeviceCommand(greenhouseId, 'Light', enabled ? 'ON' : 'OFF');
+        if (success) {
+          this.sensor = AppService.setDeviceStatus(greenhouseId, 'light', enabled);
+        }
       } else if (deviceId === 'board_1') {
-        this.sensor = AppService.setDeviceStatus(greenhouseId, 'board', enabled);
-        AppService.sendDeviceCommand(greenhouseId, 'Board', enabled ? 'ON' : 'OFF');
+        success = await AppService.sendDeviceCommand(greenhouseId, 'Board', enabled ? 'ON' : 'OFF');
+        if (success) {
+          this.sensor = AppService.setDeviceStatus(greenhouseId, 'board', enabled);
+        }
       } else if (deviceId === 'water_pump_1') {
-        this.sensor = AppService.setDeviceStatus(greenhouseId, 'water', enabled);
-        AppService.sendDeviceCommand(greenhouseId, 'BUMP', enabled ? 'ON' : 'OFF');
-      } else {
-        this.sensor = AppService.setDeviceStatus(greenhouseId, 'medicine', enabled);
-        AppService.sendDeviceCommand(greenhouseId, 'BUMP', enabled ? 'ON' : 'OFF');
+        success = await AppService.sendDeviceCommand(greenhouseId, 'BUMP', enabled ? 'ON' : 'OFF');
+        if (success) {
+          this.sensor = AppService.setDeviceStatus(greenhouseId, 'water', enabled);
+        }
       }
     }
-    promptAction.showToast({ message: '命令已下发' });
+    promptAction.showToast({ message: success ? '命令已成功下发' : '命令下发失败，设备可能不在线' });
+    this.refreshSensorFromBackend();
   }
 
   @Builder

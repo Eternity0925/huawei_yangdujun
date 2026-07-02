@@ -12,18 +12,39 @@ interface SelectItem {
 @Component
 struct DeviceManagePage {
   @State selectedIndex: number = 0;
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State deviceList: Device[] = [];
+
+  aboutToAppear(): void {
+    this.refreshData();
+  }
 
   private currentGreenhouse(): Greenhouse {
     return this.greenhouses[this.selectedIndex] || this.greenhouses[0];
   }
 
   private devices(): Device[] {
-    const list = AppService.getDevices(this.currentGreenhouse().id);
-    if (list.length > 0) {
-      return list;
-    }
-    return AppService.getDevices('default');
+    return this.deviceList.length > 0 ? this.deviceList : AppService.getDevices(this.currentGreenhouse().id);
+  }
+
+  private refreshData(): void {
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      this.greenhouses = items;
+      if (this.selectedIndex >= this.greenhouses.length) {
+        this.selectedIndex = 0;
+      }
+      this.refreshDevices();
+    }).catch(() => {
+      this.refreshDevices();
+    });
+  }
+
+  private refreshDevices(): void {
+    AppService.refreshDevicesFromDatabase(this.currentGreenhouse().id).then((items: Device[]) => {
+      this.deviceList = items;
+    }).catch(() => {
+      this.deviceList = AppService.getDevices(this.currentGreenhouse().id);
+    });
   }
 
   private greenhouseOptions(): SelectItem[] {
@@ -45,6 +66,7 @@ struct DeviceManagePage {
         .width('100%')
         .onSelect((index: number) => {
           this.selectedIndex = index;
+          this.refreshDevices();
         })
 
       ForEach(this.devices(), (item: Device) => {

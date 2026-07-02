@@ -24,7 +24,8 @@ struct AlarmHandlePage {
     status: '未处理',
     createdAt: ''
   };
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State deviceList: Device[] = [];
   private operations: SelectItem[] = [
     { value: '开启风机' },
     { value: '开启水泵' },
@@ -40,6 +41,13 @@ struct AlarmHandlePage {
       this.alarm = alarm;
       this.syncGreenhouseIndex(alarm.greenhouseId);
     }
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      this.greenhouses = items;
+      this.syncGreenhouseIndex(this.alarm.greenhouseId);
+      this.refreshDevices();
+    }).catch(() => {
+      this.refreshDevices();
+    });
   }
 
   private syncGreenhouseIndex(greenhouseId: string): void {
@@ -57,7 +65,18 @@ struct AlarmHandlePage {
   }
 
   private devices(): Device[] {
+    if (this.deviceList.length > 0) {
+      return this.deviceList;
+    }
     return AppService.getDevices(this.greenhouses[this.greenhouseIndex]?.id || 'default');
+  }
+
+  private refreshDevices(): void {
+    AppService.refreshDevicesFromDatabase(this.greenhouses[this.greenhouseIndex]?.id || 'default').then((items: Device[]) => {
+      this.deviceList = items;
+    }).catch(() => {
+      this.deviceList = AppService.getDevices(this.greenhouses[this.greenhouseIndex]?.id || 'default');
+    });
   }
 
   private deviceOptions(): SelectItem[] {
@@ -164,6 +183,7 @@ struct AlarmHandlePage {
           if (kind === 'greenhouse') {
             this.greenhouseIndex = selected;
             this.deviceIndex = 0;
+            this.refreshDevices();
           } else if (kind === 'device') {
             this.deviceIndex = selected;
           } else {
@@ -251,12 +271,12 @@ struct AlarmHandlePage {
           .borderRadius(16)
           .shadow({ radius: 8, color: '#33000000', offsetX: 0, offsetY: 3 })
           .margin({ bottom: 8 })
-          .onClick(() => {
+          .onClick(async () => {
             if (this.alarm.id.length === 0) {
               promptAction.showToast({ message: '当前没有可处理的告警' });
               return;
             }
-            const ok = AppService.handleAlarm(this.alarm.id);
+            const ok = await AppService.handleAlarmWithDatabase(this.alarm.id);
             if (!ok) {
               promptAction.showToast({ message: '告警处理失败，请返回重试' });
               return;

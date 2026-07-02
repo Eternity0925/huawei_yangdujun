@@ -8,7 +8,7 @@ public class BackendApplication {
         ApiServer server = new ApiServer(port);
         server.start();
         System.out.println("Smart Greenhouse backend started at http://localhost:" + port);
-        System.out.println("Kingbase URL: " + env("KINGBASE_URL", "jdbc:kingbase8://192.168.43.36:54321/smart_greenhouse"));
+        System.out.println("Kingbase URL: " + env("KINGBASE_URL", "jdbc:kingbase8://101.42.99.139:54321/smart_greenhouse"));
     }
 
     private static String env(String name, String fallback) {

@@ -15,9 +15,10 @@ public final class Database {
             throw new SQLException("KingbaseES JDBC driver not found. Put kingbase8.jar in backend/lib.", ex);
         }
 
-        String url = env("KINGBASE_URL", "jdbc:kingbase8://192.168.43.36:54321/smart_greenhouse");
+        String url = env("KINGBASE_URL", "jdbc:kingbase8://101.42.99.139:54321/smart_greenhouse");
         String username = env("KINGBASE_USERNAME", "system");
         String password = env("KINGBASE_PASSWORD", "123456");
+        DriverManager.setLoginTimeout(8);
         return DriverManager.getConnection(url, username, password);
     }
 

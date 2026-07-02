@@ -24,8 +24,8 @@ struct FeedbackPage {
         .height(46)
         .backgroundColor('#238B45')
         .borderRadius(23)
-        .onClick(() => {
-          const ok = AppService.submitFeedback(this.content);
+        .onClick(async () => {
+          const ok = await AppService.submitFeedback(this.content);
           if (!ok) {
             promptAction.showToast({ message: '请输入反馈内容' });
             return;

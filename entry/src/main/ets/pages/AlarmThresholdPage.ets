@@ -20,7 +20,19 @@ interface ThresholdItem {
 struct AlarmThresholdPage {
   @State selectedIndex: number = 0;
   @State threshold: ThresholdConfig = AppService.getThreshold('default');
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
+
+  aboutToAppear(): void {
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      this.greenhouses = items;
+      if (this.selectedIndex >= this.greenhouses.length) {
+        this.selectedIndex = 0;
+      }
+      this.reloadThreshold();
+    }).catch(() => {
+      this.reloadThreshold();
+    });
+  }
 
   private currentGreenhouse(): Greenhouse {
     return this.greenhouses[this.selectedIndex] || this.greenhouses[0];
@@ -36,11 +48,18 @@ struct AlarmThresholdPage {
 
   private reloadThreshold(): void {
     this.threshold = AppService.getThreshold(this.currentGreenhouse().id);
+    AppService.refreshThresholdFromDatabase(this.currentGreenhouse().id).then((data: ThresholdConfig) => {
+      this.threshold = data;
+    }).catch(() => {
+    });
   }
 
-  private saveThreshold(): void {
-    AppService.updateThreshold(this.currentGreenhouse().id, this.threshold);
-    promptAction.showToast({ message: '阈值已保存' });
+  private async saveThreshold(): Promise<void> {
+    const ok = await AppService.updateThreshold(this.currentGreenhouse().id, this.threshold);
+    promptAction.showToast({ message: ok ? '阈值已保存到数据库' : '保存失败，请检查后端连接' });
+    if (ok) {
+      this.reloadThreshold();
+    }
   }
 
   private items(): ThresholdItem[] {

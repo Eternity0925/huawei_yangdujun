@@ -28,25 +28,20 @@ struct GreenhouseHomePage {
   private static readonly LOG_TAG: string = 'GreenhouseCloud';
   @State selectedIndex: number = 0;
   @State sensorData: SensorData = AppService.emptyCloudSensorData();
-  @State cloudAirTemperature: number = -1;
-  @State cloudAirHumidity: number = -1;
-  @State cloudLight: number = -1;
-  @State cloudDistance: number = -1;
-  @State cloudFanGear: number = 0;
-  @State cloudLightOn: boolean = false;
   @State isLoadingAi: boolean = false;
   @State aiSuggestion: string = '';
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
   private refreshTimer: number = -1;
   private stages: StageItem[] = [
-    { name: '菌丝生长期', image: $r('app.media.deep_image_1') },
-    { name: '催菇期', image: $r('app.media.deep_image_2') },
-    { name: '原基形成期', image: $r('app.media.deep_image_3') },
-    { name: '出菇管理期', image: $r('app.media.deep_image_4') }
+    { name: '\u83cc\u4e1d\u751f\u957f\u671f', image: $r('app.media.deep_image_1') },
+    { name: '\u50ac\u83c7\u671f', image: $r('app.media.deep_image_2') },
+    { name: '\u539f\u57fa\u5f62\u6210\u671f', image: $r('app.media.deep_image_3') },
+    { name: '\u51fa\u83c7\u7ba1\u7406\u671f', image: $r('app.media.deep_image_4') }
   ];
 
   aboutToAppear(): void {
     this.refreshSensor();
+    this.refreshGreenhouses();
     if (this.refreshTimer < 0) {
       this.refreshTimer = setInterval(() => {
         this.refreshSensor();
@@ -65,7 +60,16 @@ struct GreenhouseHomePage {
     if (this.selectedIndex >= 0 && this.selectedIndex < this.greenhouses.length) {
       return this.greenhouses[this.selectedIndex];
     }
-    return this.greenhouses[0];
+    if (this.greenhouses.length > 0) {
+      return this.greenhouses[0];
+    }
+    return {
+      id: '1',
+      name: 'A01 \u7f8a\u809a\u83cc\u667a\u80fd\u5927\u68da',
+      location: '',
+      area: '',
+      stage: ''
+    };
   }
 
   private refreshSensor(): void {
@@ -74,33 +78,72 @@ struct GreenhouseHomePage {
         'home assign Temp=%{public}f Humi=%{public}f Lumi=%{public}f SoilHumi=%{public}f CO2=%{public}f',
         data.airTemperature, data.airHumidity, data.light, data.soilHumidity, data.co2);
       this.sensorData = data;
-      this.cloudAirTemperature = data.airTemperature;
-      this.cloudAirHumidity = data.airHumidity;
-      this.cloudLight = data.light;
-      this.cloudDistance = data.distance;
-      this.cloudFanGear = data.fanGear;
-      this.cloudLightOn = data.lightOn;
     }).catch((err: Error) => {
       hilog.error(GreenhouseHomePage.LOG_DOMAIN, GreenhouseHomePage.LOG_TAG,
         'home refresh failed: %{public}s', JSON.stringify(err));
     });
   }
 
+  private refreshGreenhouses(): void {
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      if (items.length === 0) {
+        this.refreshSensor();
+        return;
+      }
+      this.greenhouses = items;
+      if (this.selectedIndex >= this.greenhouses.length) {
+        this.selectedIndex = 0;
+      }
+      this.refreshSensor();
+    }).catch(() => {
+      this.refreshSensor();
+    });
+  }
+
   private async setSwitch(key: string, value: boolean, commandName: string): Promise<void> {
-    this.sensorData = AppService.setDeviceStatus(this.currentGreenhouse().id, key, value);
+    if (key === 'medicine') {
+      promptAction.showToast({ message: '药泵暂不支持控制，仅显示状态' });
+      return;
+    }
+    if (!AppService.canSendCloudCommand(this.currentGreenhouse().id)) {
+      promptAction.showToast({ message: '\u53ea\u6709\u4e00\u53f7\u5927\u68da\u652f\u6301\u4e91\u7aef\u547d\u4ee4\u4e0b\u53d1' });
+      this.refreshSensor();
+      return;
+    }
     const success = await AppService.sendDeviceCommand(this.currentGreenhouse().id, commandName, value ? 'ON' : 'OFF');
-    promptAction.showToast({ message: success ? (value ? '已开启' : '已关闭') : '命令下发失败' });
+    if (success) {
+      this.sensorData = AppService.setDeviceStatus(this.currentGreenhouse().id, key, value);
+      promptAction.showToast({ message: value ? '\u5df2\u5f00\u542f' : '\u5df2\u5173\u95ed' });
+      this.refreshSensor();
+    } else {
+      promptAction.showToast({ message: '\u547d\u4ee4\u4e0b\u53d1\u5931\u8d25\uff0c\u8bbe\u5907\u53ef\u80fd\u4e0d\u5728\u7ebf' });
+      this.refreshSensor();
+    }
   }
 
   private async changeFan(delta: number): Promise<void> {
-    this.sensorData = AppService.setFanGear(this.currentGreenhouse().id, this.sensorData.fanGear + delta);
-    await AppService.sendDeviceCommand(this.currentGreenhouse().id, 'Fengd', this.sensorData.fanGear);
-    promptAction.showToast({ message: this.sensorData.fanGear === 0 ? '风机已关闭' : `风速调至${this.sensorData.fanGear}档` });
+    if (!AppService.canSendCloudCommand(this.currentGreenhouse().id)) {
+      promptAction.showToast({ message: '\u53ea\u6709\u4e00\u53f7\u5927\u68da\u652f\u6301\u4e91\u7aef\u547d\u4ee4\u4e0b\u53d1' });
+      this.refreshSensor();
+      return;
+    }
+    const nextGear = Math.max(0, Math.min(9, this.sensorData.fanGear + delta));
+    const success = await AppService.sendDeviceCommand(this.currentGreenhouse().id, 'Fengd', nextGear);
+    if (success) {
+      this.sensorData = AppService.setFanGear(this.currentGreenhouse().id, nextGear);
+      promptAction.showToast({
+        message: this.sensorData.fanGear === 0 ? '\u98ce\u673a\u5df2\u5173\u95ed' : `\u98ce\u901f\u8c03\u81f3${this.sensorData.fanGear}\u6863`
+      });
+      this.refreshSensor();
+    } else {
+      promptAction.showToast({ message: '\u98ce\u673a\u547d\u4ee4\u4e0b\u53d1\u5931\u8d25\uff0c\u8bbe\u5907\u53ef\u80fd\u4e0d\u5728\u7ebf' });
+      this.refreshSensor();
+    }
   }
 
   private async requestAiSuggestion(): Promise<void> {
     if (this.isLoadingAi) {
-      promptAction.showToast({ message: '正在获取 AI 建议，请稍候' });
+      promptAction.showToast({ message: '\u6b63\u5728\u83b7\u53d6 AI \u5efa\u8bae\uff0c\u8bf7\u7a0d\u5019' });
       return;
     }
     this.isLoadingAi = true;
@@ -120,17 +163,21 @@ struct GreenhouseHomePage {
   }
 
   private stageName(): string {
+    if (this.sensorData.growthStage <= 0) {
+      return '--';
+    }
     const stage = Math.max(1, Math.min(4, this.sensorData.growthStage));
     return this.stages[stage - 1].name;
   }
 
   private sensorItems(): SensorCardItem[] {
     return [
-      { title: '空气温度(℃)', value: this.cloudValue(this.cloudAirTemperature), image: $r('app.media.sun_temp') },
-      { title: '空气湿度(RH%)', value: this.cloudValue(this.cloudAirHumidity), image: $r('app.media.o_water') },
-      { title: '光照强度(lux)', value: this.cloudValue(this.cloudLight), image: $r('app.media.sun') },
-      { title: '土壤温度(℃)', value: this.cloudValue(this.sensorData.soilTemperature), image: $r('app.media.jun_temp') },
-      { title: '土壤湿度(RH%)', value: this.cloudValue(this.sensorData.soilHumidity), image: $r('app.media.jun_water') },
+      { title: '\u7a7a\u6c14\u6e29\u5ea6(\u2103)', value: this.cloudValue(this.sensorData.airTemperature), image: $r('app.media.sun_temp') },
+      { title: '\u7a7a\u6c14\u6e7f\u5ea6(RH%)', value: this.cloudValue(this.sensorData.airHumidity), image: $r('app.media.o_water') },
+      { title: '\u5149\u7167\u5f3a\u5ea6(lux)', value: this.cloudValue(this.sensorData.light), image: $r('app.media.sun') },
+      { title: '\u8ddd\u79bb(cm)', value: this.cloudValue(this.sensorData.distance), image: $r('app.media.jun_temp') },
+      { title: '\u571f\u58e4\u6e29\u5ea6(\u2103)', value: this.cloudValue(this.sensorData.soilTemperature), image: $r('app.media.jun_temp') },
+      { title: '\u571f\u58e4\u6e7f\u5ea6(RH%)', value: this.cloudValue(this.sensorData.soilHumidity), image: $r('app.media.jun_water') },
       { title: 'CO2(ppm)', value: this.cloudValue(this.sensorData.co2), image: $r('app.media.co2') },
       { title: 'pH', value: this.cloudValue(this.sensorData.ph), image: $r('app.media.ph') }
     ];
@@ -138,6 +185,18 @@ struct GreenhouseHomePage {
 
   private cloudValue(value: number): string {
     return value < 0 ? '--' : `${value}`;
+  }
+
+  private gearValue(value: number): string {
+    return value < 0 ? '--' : value + ' \u6863';
+  }
+
+  private switchStatus(value: boolean): string {
+    return value ? '\u5f00\u542f' : '\u5173\u95ed';
+  }
+
+  private textValue(value: string): string {
+    return value && value.length > 0 ? value : '--';
   }
 
   @Builder
@@ -192,7 +251,15 @@ struct GreenhouseHomePage {
         .fontSize(16)
         .fontWeight(FontWeight.Bold)
         .fontColor('#141E17')
-      Blank()
+        .width(112)
+      Column({ space: 2 }) {
+        Text(this.switchStatus(enabled))
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(enabled ? AndroidColor.GREEN_MAIN : '#667085')
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
       Toggle({ type: ToggleType.Switch, isOn: enabled })
         .selectedColor(AndroidColor.GREEN_MAIN)
         .onChange((value: boolean) => this.setSwitch(key, value, commandName))
@@ -236,12 +303,12 @@ struct GreenhouseHomePage {
 
   build() {
     Column() {
-      AndroidTopBar({ title: '大棚' })
+      AndroidTopBar({ title: '\u5927\u68da' })
       Scroll() {
         Column() {
           Column() {
             Row() {
-              Text('请选择大棚')
+              Text('\u8bf7\u9009\u62e9\u5927\u68da')
                 .fontColor(AndroidColor.GREEN_PRIMARY)
                 .fontWeight(FontWeight.Bold)
               Select(this.greenhouseOptions())
@@ -265,7 +332,7 @@ struct GreenhouseHomePage {
           .margin({ bottom: 12 })
 
           Column({ space: 10 }) {
-            this.SectionTitle('生长阶段')
+            this.SectionTitle('\u751f\u957f\u9636\u6bb5')
             Row({ space: 6 }) {
               ForEach(this.stages, (item: StageItem, index: number) => {
                 this.StageCell(item, index)
@@ -279,13 +346,13 @@ struct GreenhouseHomePage {
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#238B45')
               Blank()
-              Text(`AI预警：${this.sensorData.aiWarning}`)
+              Text('AI\u9884\u8b66\uff1a' + this.textValue(this.sensorData.aiWarning))
                 .fontSize(14)
                 .fontColor('#5A713F')
             }
             .width('100%')
 
-            Text(`更新时间：${this.sensorData.updatedAt}`)
+            Text('\u66f4\u65b0\u65f6\u95f4\uff1a' + this.sensorData.updatedAt)
               .fontSize(13)
               .fontColor('#667085')
               .width('100%')
@@ -297,64 +364,13 @@ struct GreenhouseHomePage {
           .margin({ bottom: 12 })
 
           Column() {
-            this.SectionTitle('实时环境数据')
+            this.SectionTitle('\u5b9e\u65f6\u73af\u5883\u6570\u636e')
             Grid() {
-              GridItem() {
-                this.SensorCard({
-                  title: '空气温度(℃)',
-                  value: this.cloudValue(this.cloudAirTemperature),
-                  image: $r('app.media.sun_temp')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: '空气湿度(RH%)',
-                  value: this.cloudValue(this.cloudAirHumidity),
-                  image: $r('app.media.o_water')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: '光照强度(lux)',
-                  value: this.cloudValue(this.cloudLight),
-                  image: $r('app.media.sun')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: '距离(cm)',
-                  value: this.cloudValue(this.cloudDistance),
-                  image: $r('app.media.jun_temp')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: '土壤温度(℃)',
-                  value: this.cloudValue(this.sensorData.soilTemperature),
-                  image: $r('app.media.jun_temp')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: '土壤湿度(RH%)',
-                  value: this.cloudValue(this.sensorData.soilHumidity),
-                  image: $r('app.media.jun_water')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: 'CO2(ppm)',
-                  value: this.cloudValue(this.sensorData.co2),
-                  image: $r('app.media.co2')
-                })
-              }
-              GridItem() {
-                this.SensorCard({
-                  title: 'pH',
-                  value: this.cloudValue(this.sensorData.ph),
-                  image: $r('app.media.ph')
-                })
-              }
+              ForEach(this.sensorItems(), (item: SensorCardItem) => {
+                GridItem() {
+                  this.SensorCard(item)
+                }
+              }, (item: SensorCardItem) => `${item.title}-${item.value}`)
             }
             .columnsTemplate('1fr 1fr')
             .columnsGap(10)
@@ -367,11 +383,11 @@ struct GreenhouseHomePage {
           .margin({ bottom: 12 })
 
           Column({ space: 10 }) {
-            this.SectionTitle('AI 智能建议')
-            Text('根据当前大棚环境数据生成种植建议')
+            this.SectionTitle('AI \u79cd\u690d\u5efa\u8bae')
+            Text('\u6839\u636e\u5f53\u524d\u5927\u68da\u73af\u5883\u6570\u636e\u751f\u6210\u79cd\u690d\u5efa\u8bae')
               .fontSize(14)
               .fontColor('#5A713F')
-            Button(this.isLoadingAi ? '正在获取...' : '获取AI建议')
+            Button(this.isLoadingAi ? '\u6b63\u5728\u751f\u6210...' : '\u83b7\u53d6 AI \u5efa\u8bae')
               .width('100%')
               .height(44)
               .fontSize(16)
@@ -398,14 +414,14 @@ struct GreenhouseHomePage {
           .margin({ bottom: 12 })
 
           Column() {
-            this.SectionTitle('视频监控')
+            this.SectionTitle('\u89c6\u9891\u76d1\u63a7')
             Scroll() {
               Row({ space: 10 }) {
-                this.VideoCell($r('app.media.mogu1'), '大棚1号视频')
-                this.VideoCell($r('app.media.mogu2'), '大棚2号视频')
-                this.VideoCell($r('app.media.mogu3'), '大棚3号视频')
-                this.VideoCell($r('app.media.mogu4'), '大棚4号视频')
-                this.VideoCell($r('app.media.mogu6'), '大棚5号视频')
+                this.VideoCell($r('app.media.mogu1'), '\u5927\u68da1\u53f7\u89c6\u9891')
+                this.VideoCell($r('app.media.mogu2'), '\u5927\u68da2\u53f7\u89c6\u9891')
+                this.VideoCell($r('app.media.mogu3'), '\u5927\u68da3\u53f7\u89c6\u9891')
+                this.VideoCell($r('app.media.mogu4'), '\u5927\u68da4\u53f7\u89c6\u9891')
+                this.VideoCell($r('app.media.mogu6'), '\u5927\u68da5\u53f7\u89c6\u9891')
               }
             }
             .scrollable(ScrollDirection.Horizontal)
@@ -418,24 +434,27 @@ struct GreenhouseHomePage {
           .margin({ bottom: 12 })
 
           Column() {
-            this.SectionTitle('设备状态')
-            this.DeviceRow('挡光板状态', 'board', 'DangGuangBan', this.sensorData.boardOn)
-            this.DeviceRow('药泵状态', 'medicine', 'BUMP', this.sensorData.medicinePumpOn)
-            this.DeviceRow('水泵状态', 'water', 'BUMP', this.sensorData.waterPumpOn)
-            this.DeviceRow('灯泡状态', 'light', 'LightSt', this.cloudLightOn)
+            this.SectionTitle('\u8bbe\u5907\u72b6\u6001')
+            this.DeviceRow('\u6321\u5149\u677f\u72b6\u6001', 'board', 'DangGuangBan', this.sensorData.boardOn)
+            this.DeviceRow('\u836f\u6cf5\u72b6\u6001', 'medicine', 'BUMP', this.sensorData.medicinePumpOn)
+            this.DeviceRow('\u6c34\u6cf5\u72b6\u6001', 'water', 'BUMP', this.sensorData.waterPumpOn)
+            this.DeviceRow('\u706f\u6ce1\u72b6\u6001', 'light', 'LightSt', this.sensorData.lightOn)
 
             Row() {
-              Text('风扇档位')
+              Text('\u98ce\u673a\u6863\u4f4d')
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#141E17')
-              Text(`${this.cloudFanGear} 档`)
+                .width(112)
+              Column({ space: 2 }) {
+                Text(this.gearValue(this.sensorData.fanGear))
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.sensorData.fanGear > 0 ? AndroidColor.GREEN_MAIN : '#141E17')
+              }
                 .layoutWeight(1)
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#141E17')
-                .textAlign(TextAlign.Center)
-              Button('调高')
+                .alignItems(HorizontalAlign.Start)
+              Button('\u8c03\u9ad8')
                 .width(56)
                 .height(32)
                 .fontSize(12)
@@ -444,7 +463,7 @@ struct GreenhouseHomePage {
                 .borderRadius(16)
                 .margin({ right: 8 })
                 .onClick(() => this.changeFan(1))
-              Button('调低')
+              Button('\u8c03\u4f4e')
                 .width(56)
                 .height(32)
                 .fontSize(12)

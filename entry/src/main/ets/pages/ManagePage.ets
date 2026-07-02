@@ -27,6 +27,10 @@ struct ManagePage {
 
   aboutToAppear(): void {
     this.alarms = AppService.getAlarms().slice(0, 5);
+    AppService.refreshAlarmsFromDatabase().then((items: AlarmRecord[]) => {
+      this.alarms = items.slice(0, 5);
+    }).catch(() => {
+    });
   }
 
   private isHandled(item: AlarmRecord): boolean {

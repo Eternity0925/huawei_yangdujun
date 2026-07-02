@@ -1,6 +1,6 @@
 import { router } from '@kit.ArkUI';
 import webview from '@ohos.web.webview';
-import { Greenhouse, SensorData } from '../models/AppModels';
+import { EnvironmentPoint, Greenhouse } from '../models/AppModels';
 import { AppService } from '../services/AppService';
 
 interface SelectItem {
@@ -42,8 +42,21 @@ interface WebChartPayload {
 @Component
 struct RealTimeAnalysisPage {
   @State selectedIndex: number = 0;
+  @State greenhouses: Greenhouse[] = AppService.getGreenhouses();
+  @State history: EnvironmentPoint[] = [];
   private controller: webview.WebviewController = new webview.WebviewController();
-  private greenhouses: Greenhouse[] = AppService.getGreenhouses();
+
+  aboutToAppear(): void {
+    AppService.refreshGreenhousesFromDatabase().then((items: Greenhouse[]) => {
+      this.greenhouses = items;
+      if (this.selectedIndex >= this.greenhouses.length) {
+        this.selectedIndex = 0;
+      }
+      this.refreshHistory();
+    }).catch(() => {
+      this.refreshHistory();
+    });
+  }
 
   private currentGreenhouse(): Greenhouse {
     return this.greenhouses[this.selectedIndex] || this.greenhouses[0];
@@ -58,23 +71,41 @@ struct RealTimeAnalysisPage {
   }
 
   private chartData(): HourPoint[] {
-    const base: SensorData = AppService.getSensorData(this.currentGreenhouse().id);
-    const data: HourPoint[] = [];
-    for (let i = 23; i >= 0; i--) {
-      const hour = (24 - i) % 24;
-      const wave = (24 - i) % 6;
-      data.push({
-        label: `${hour < 10 ? '0' + hour : hour}时`,
-        airTemp: Number((base.airTemperature + wave * 0.28 - 0.7).toFixed(1)),
-        airHum: Math.round(base.airHumidity + wave - 3),
-        soilTemp: Number((base.soilTemperature + wave * 0.18 - 0.4).toFixed(1)),
-        soilHum: Math.round(base.soilHumidity + wave - 3),
-        light: Math.max(360, Math.round(base.light + wave * 70 - 180)),
-        co2: Math.max(360, Math.round(base.co2 + wave * 18 - 44)),
-        ph: Number((base.ph + wave * 0.03 - 0.08).toFixed(2))
-      });
+    if (this.history.length > 0) {
+      const points: HourPoint[] = [];
+      for (let i = 0; i < this.history.length; i++) {
+        const item = this.history[i];
+        points.push({
+          label: this.timeLabel(item.time),
+          airTemp: item.temperature,
+          airHum: item.humidity,
+          soilTemp: item.soilTemperature,
+          soilHum: item.soilHumidity,
+          light: item.light,
+          co2: item.co2,
+          ph: item.ph
+        });
+      }
+      return points;
     }
-    return data;
+
+    return [];
+  }
+
+  private refreshHistory(): void {
+    AppService.refreshHistoryFromDatabase(this.currentGreenhouse().id, 24).then((items: EnvironmentPoint[]) => {
+      this.history = items;
+      setTimeout(() => this.injectCharts(), 30);
+    }).catch(() => {
+      setTimeout(() => this.injectCharts(), 30);
+    });
+  }
+
+  private timeLabel(time: string): string {
+    if (time.length >= 16) {
+      return time.substring(11, 16);
+    }
+    return time;
   }
 
   private seriesValues(points: HourPoint[], key: string): number[] {
@@ -223,7 +254,7 @@ struct RealTimeAnalysisPage {
         .margin({ left: 12 })
         .onSelect((index: number) => {
           this.selectedIndex = index;
-          setTimeout(() => this.injectCharts(), 30);
+          this.refreshHistory();
         })
     }
     .width('100%')

@@ -35,20 +35,10 @@ export class AppState {
 
   static currentUser: User | null = null;
 
-  static users: StoredUser[] = [
-    {
-      id: 'user-demo',
-      phone: '13800138000',
-      password: 'abc12345',
-      token: 'local_demo_token',
-      nickname: '管理员',
-      avatar: ''
-    }
-  ];
+  static users: StoredUser[] = [];
 
   static greenhouses: Greenhouse[] = [
-    { id: 'default', name: '默认大棚', location: '示范基地 A 区', area: '100', stage: '出菇管理期' },
-    { id: 'greenhouse-2', name: '羊肚菌一号棚', location: '示范基地 A 区', area: '180', stage: '原基形成期' }
+    { id: '1', name: 'A01 \u7f8a\u809a\u83cc\u667a\u80fd\u5927\u68da', location: '\u6e29\u5ba4\u4e00\u533a / \u5317\u4fa7', area: '420', stage: '\u51fa\u83c7\u671f' }
   ];
 
   static sensors: SensorEntry[] = [
@@ -148,9 +138,8 @@ export class AppState {
 
   static settings: SettingItem[] = [
     { id: 'alarmPush', title: '告警提醒', description: '环境异常时提醒管理人员', enabled: true },
-    { id: 'autoSync', title: '自动同步', description: '进入页面时刷新云端数据', enabled: true },
-    { id: 'ai', title: 'AI 种植建议', description: '根据环境数据生成操作建议', enabled: true },
-    { id: 'voice', title: '语音识别', description: '按住说话后识别并询问 AI', enabled: true }
+    { id: 'autoSync', title: '自动同步', description: '进入页面时刷新云端和数据库数据', enabled: true },
+    { id: 'ai', title: 'AI 种植建议', description: '根据环境数据生成操作建议', enabled: true }
   ];
 
   static feedbacks: FeedbackRecord[] = [];
@@ -169,6 +158,10 @@ export class AppState {
 
   static isLoggedIn(): boolean {
     return AppState.currentUser !== null;
+  }
+
+  static setCurrentUser(user: User): void {
+    AppState.currentUser = user;
   }
 
   static login(phone: string, password: string): boolean {
